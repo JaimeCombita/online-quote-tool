@@ -1,36 +1,73 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Propuestas PDF
 
-## Getting Started
+Aplicacion serverless para crear propuestas comerciales y generar PDF.
 
-First, run the development server:
+## Estado actual
+
+Fase 1 inicializada con Opcion A:
+
+- Sin base de datos.
+- Borradores en almacenamiento local del navegador.
+- Arquitectura base orientada a DDD y SOLID.
+- Identidad visual alineada con JC Engine usando design tokens centralizados.
+
+## Branding corporativo
+
+La configuracion de marca esta centralizada en `src/modules/shared/branding/brand.config.ts`.
+
+Assets esperados en `public/brand`:
+
+- `logo.png`
+- `logo-optimizado.png`
+- `favicon-32x32.png`
+- `logonew.png`
+
+Si en el futuro cambia la identidad visual, basta actualizar esos archivos y/o el archivo `brand.config.ts`.
+
+## Stack tecnico
+
+- Next.js (App Router)
+- TypeScript
+- Tailwind CSS
+
+## Estructura base
+
+La organizacion principal esta en src/modules/proposals:
+
+- domain: entidades y contratos del dominio.
+- application: casos de uso y puertos.
+- infrastructure: adaptadores (localStorage, reloj del sistema, generador de id).
+- composition: ensamblado de dependencias.
+- presentation: componentes de interfaz del modulo.
+
+## Scripts
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run lint
+npm run build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Siguiente alcance
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. Editor incremental de secciones.
+2. Validaciones de contrato funcional.
+3. Motor de PDF serverless (on-demand, sin persistencia en navegador).
+4. Envio de PDF por email.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Politica de PDF
 
-## Learn More
+- El PDF se genera bajo demanda en `POST /api/proposals/pdf`.
+- No se guarda en localStorage ni en base de datos.
+- Cada solicitud genera un archivo nuevo en tiempo real y se descarga directamente.
 
-To learn more about Next.js, take a look at the following resources:
+## Envio de PDF por email
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- Endpoint: `POST /api/proposals/email`.
+- El PDF se genera bajo demanda al momento de enviar y se adjunta al correo.
+- No se persiste ninguna copia del PDF en el navegador o almacenamiento local.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Variables de entorno requeridas:
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `RESEND_API_KEY`
+- `RESEND_FROM_EMAIL` (opcional, por defecto `JC Engine <onboarding@resend.dev>`)

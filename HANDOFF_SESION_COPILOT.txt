@@ -1,0 +1,103 @@
+PROYECTO: Generador de propuestas comerciales en PDF (Fase 1 - Opcion A)
+FECHA DE CORTE: 2026-04-23
+ESTADO: Base tecnica creada y validada. Listo para Sprint 1 de desarrollo funcional.
+
+1) CONTEXTO DE NEGOCIO ACORDADO
+- Objetivo: app serverless desplegable en Vercel para crear propuestas y exportar PDF.
+- Fase 1 elegida: Opcion A (sin base de datos).
+- Persistencia: local (navegador) + export/import JSON.
+- Plantilla: una sola plantilla maestra con secciones dinamicas numeradas.
+- Email: incluir envio del PDF por email desde la app.
+- Firma: estilo manuscrita por tipografia (no obligatoriamente imagen).
+- Vision futura: evolucionar a SaaS multiempresa.
+
+2) DECISIONES TECNICAS ACORDADAS
+- Framework: Next.js App Router + TypeScript.
+- Arquitectura: DDD + SOLID desde el inicio.
+- Generacion PDF (pendiente en siguientes sprints): serverless.
+- Email (pendiente en siguientes sprints): via proveedor transaccional (ej. Resend).
+- Sin DB en fase 1 para acelerar entrega y simplificar operacion.
+
+3) ANALISIS AIRTABLE (CONCLUSION)
+- Viable para etapa puente/prototipo, pero NO recomendado como nucleo definitivo de SaaS.
+- Riesgos: escalabilidad, costos al crecer, aislamiento multi-tenant, dependencia de tercero.
+- Decision practica: no usar Airtable como base principal para este arranque.
+
+4) REPOSITORIO Y UBICACION
+- Ruta: C:\Users\leona\onedrive\documentos\repositorios\propuestas-pdf
+- Estado de repo: creado, con git inicializado por create-next-app.
+
+5) TRABAJO YA IMPLEMENTADO
+- Home inicial reemplazada por pagina de arranque del proyecto.
+- Estructura modular DDD/SOLID creada para modulo de propuestas.
+- Casos de uso iniciales implementados:
+  - Crear borrador
+  - Listar borradores
+- Adaptador de almacenamiento local (localStorage) implementado.
+- Composicion de dependencias implementada (inyeccion manual).
+- Componente de bootstrap del modulo implementado y funcional.
+- README actualizado con estado del proyecto y siguientes pasos.
+
+6) ESTRUCTURA DE CAPAS CREADA
+- src/modules/proposals/domain
+  - entities/Proposal.ts
+  - repositories/ProposalDraftRepository.ts
+  - errors/DomainError.ts
+- src/modules/proposals/application
+  - ports/Clock.ts
+  - ports/IdGenerator.ts
+  - use-cases/CreateProposalDraftUseCase.ts
+  - use-cases/ListProposalDraftsUseCase.ts
+- src/modules/proposals/infrastructure
+  - browser/BrowserStorage.ts
+  - browser/BrowserProposalDraftRepository.ts
+  - system/SystemClock.ts
+  - system/UuidGenerator.ts
+- src/modules/proposals/composition
+  - proposalModule.ts
+- src/modules/proposals/presentation
+  - components/ProposalModuleBootstrap.tsx
+
+7) VALIDACION TECNICA YA EJECUTADA
+- npm run lint => OK
+- npm run build => OK
+
+8) CONTRATO FUNCIONAL MVP (YA DEFINIDO)
+Pantallas/modulos clave:
+- Dashboard (nueva propuesta, duplicar, eliminar, export/import JSON)
+- Editor (datos generales + secciones dinamicas + inversion + cierre)
+- Vista previa PDF
+- Envio por email
+- Configuracion visual basica
+
+Reglas clave:
+- Requeridos para generar PDF: titulo, cliente, fecha, al menos una seccion activa.
+- Secciones numeradas automaticamente segun orden visible.
+- Envio email bloqueado si no hay PDF valido y vigente.
+
+9) PROXIMO PASO INMEDIATO (SPRINT 1)
+Implementar editor incremental de propuestas:
+1. Formulario de datos generales
+2. CRUD de secciones dinamicas
+3. Reordenamiento de secciones
+4. Activar/desactivar secciones
+5. Guardado local automatico
+6. Exportar/importar JSON
+
+10) PLAN DE EJECUCION SUGERIDO (ORDEN)
+- Paso A: Definir DTOs/form state del editor y validacion (zod recomendado)
+- Paso B: Crear UI del editor por bloques (General, Secciones, Inversion, Cierre)
+- Paso C: Conectar casos de uso y repositorio local
+- Paso D: Persistencia automatica con debounce
+- Paso E: Botones de exportar/importar JSON
+- Paso F: Ajustes UX y validaciones finales
+
+11) PROMPT DE CONTINUIDAD PARA PEGAR EN OTRA VENTANA DE COPILOT
+"Continuemos el proyecto en C:\\Users\\leona\\onedrive\\documentos\\repositorios\\propuestas-pdf.
+Lee primero HANDOFF_SESION_COPILOT.txt y luego implementa Sprint 1 del editor incremental respetando DDD/SOLID ya existente.
+No cambies la arquitectura base. Empieza por:
+1) Formulario de datos generales.
+2) CRUD + reordenamiento de secciones.
+3) guardado local automatico.
+4) export/import JSON.
+Valida con npm run lint y npm run build al final."
