@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { ReactNode } from "react";
-import { brandCssVariables, jcBrandConfig } from "../../branding/brand.config";
+import { jcBrandConfig } from "../../branding/brand.config";
 
 interface JcEngineBrandFrameProps {
   children: ReactNode;
@@ -19,7 +19,7 @@ export function JcEngineBrandFrame({
   topRightContent,
 }: JcEngineBrandFrameProps) {
   return (
-    <div className="jc-app-bg flex min-h-screen flex-col" style={brandCssVariables}>
+    <div className="jc-app-bg flex min-h-screen flex-col">
       <header className="jc-shell-border border-b bg-white/95 backdrop-blur">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-3">

@@ -10,14 +10,14 @@ export class ImportProposalUseCase {
       
       // Basic validation
       if (!data.id || !data.metadata || !data.client || !data.issuer) {
-        throw new Error("Invalid proposal JSON structure");
+        throw new Error("Estructura JSON de propuesta invalida");
       }
 
       const proposal = Proposal.rehydrate(data);
       await this.proposalDraftRepository.save(proposal);
       return proposal;
     } catch (error) {
-      throw new Error(`Failed to import proposal: ${error instanceof Error ? error.message : "Unknown error"}`);
+      throw new Error(`No fue posible importar la propuesta: ${error instanceof Error ? error.message : "Error desconocido"}`);
     }
   }
 }

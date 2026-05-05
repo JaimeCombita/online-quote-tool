@@ -1,8 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
 import { ProposalInvestment } from "../../domain/entities/Proposal";
-import { UuidGenerator } from "../../infrastructure/system/UuidGenerator";
+import {
+  formatNumberDisplay,
+  parseFormattedNumber,
+  useInvestmentForm,
+} from "../hooks/forms/useInvestmentForm";
 
 interface InvestmentFormProps {
   initialData: ProposalInvestment;
@@ -15,96 +18,25 @@ const currencyFormatterByCode = {
   USD: new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0, maximumFractionDigits: 0 }),
 };
 
-// Number formatter for display (without currency symbol)
-const numberFormatterDisplay = new Intl.NumberFormat("es-CO", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-
-// Helper to format number for display (1000000 -> "1.000.000")
-const formatNumberDisplay = (value: number): string => {
-  return numberFormatterDisplay.format(Math.round(value));
-};
-
-// Helper to parse formatted number from input ("1.000.000" -> 1000000)
-const parseFormattedNumber = (value: string): number => {
-  return Number(value.replace(/\./g, ""));
-};
-
-const hasInvestmentChanges = (original: ProposalInvestment, current: ProposalInvestment): boolean => {
-  return JSON.stringify(original) !== JSON.stringify(current);
-};
-
 export function InvestmentForm({ initialData, currency, onSubmit }: InvestmentFormProps) {
-  const [formData, setFormData] = useState<ProposalInvestment>(initialData);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const idGenerator = useMemo(() => new UuidGenerator(), []);
-  const hasChanges = hasInvestmentChanges(initialData, formData);
-
+  const {
+    formData,
+    setFormData,
+    isSubmitting,
+    error,
+    hasChanges,
+    subtotal,
+    totalTax,
+    total,
+    updateRow,
+    addRow,
+    removeRow,
+    handleSubmit,
+  } = useInvestmentForm({
+    initialData,
+    onSubmit,
+  });
   const formatter = currencyFormatterByCode[currency];
-
-  const subtotal = formData.rows.reduce(
-    (sum, row) => sum + row.quantity * row.unitPrice,
-    0,
-  );
-
-  const totalTax = formData.rows.reduce(
-    (sum, row) => sum + row.quantity * row.unitPrice * (row.taxRate / 100),
-    0,
-  );
-
-  const total = subtotal + totalTax;
-
-  const updateRow = (rowId: string, field: string, value: string | number) => {
-    setFormData((current) => ({
-      ...current,
-      rows: current.rows.map((row) => (row.id === rowId ? { ...row, [field]: value } : row)),
-    }));
-  };
-
-  const addRow = () => {
-    setFormData((current) => ({
-      ...current,
-      rows: [
-        ...current.rows,
-        {
-          id: idGenerator.generate(),
-          concept: "",
-          description: "",
-          quantity: 1,
-          unitPrice: 0,
-          taxRate: 0,
-        },
-      ],
-    }));
-  };
-
-  const removeRow = (rowId: string) => {
-    setFormData((current) => ({
-      ...current,
-      rows: current.rows.filter((row) => row.id !== rowId),
-    }));
-  };
-
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setError(null);
-
-    if (formData.enabled && formData.rows.some((row) => !row.concept.trim())) {
-      setError("Cada fila de inversion debe tener un concepto.");
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      await onSubmit(formData);
-    } catch (submitError) {
-      setError(
-        submitError instanceof Error ? submitError.message : "No fue posible guardar la inversion.",
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   return (
     <form className="space-y-6" onSubmit={handleSubmit}>

@@ -1,6 +1,7 @@
-import Image from "next/image";
 import { Proposal } from "../../domain/entities/Proposal";
 import { jcBrandConfig } from "@/modules/shared/branding/brand.config";
+import signatureFontStyles from "../styles/SignatureFonts.module.css";
+import styles from "./ProposalHtmlPreview.module.css";
 
 interface ProposalHtmlPreviewProps {
   proposal: Proposal;
@@ -12,10 +13,13 @@ const currencyFormatters = {
   USD: new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0, maximumFractionDigits: 0 }),
 };
 
-const signatureFontClassByValue = {
-  "script-elegant": "font-serif italic tracking-wide",
-  "script-formal": "font-serif italic",
-  "script-hand": "font-mono italic",
+const signatureFontClassByValue: Record<string, string> = {
+  "script-elegant": "scriptElegant",
+  "script-formal": "scriptFormal",
+  "script-hand": "scriptHand",
+  "serif-classic": "serifClassic",
+  "sans-clean": "sansClean",
+  "modern-sign": "modernSign",
 };
 
 const splitLines = (value: string) =>
@@ -31,14 +35,7 @@ const toExternalUrl = (value: string): string => {
   return `https://${value}`;
 };
 
-const A4_PAGE_WIDTH = 595;
-const A4_PAGE_HEIGHT = 842;
-const PREVIEW_HEADER_HEIGHT = 128;
-const PREVIEW_FOOTER_HEIGHT = 34;
 const PAGE_CONTENT_HEIGHT = 680;
-const PREVIEW_HEADER_PERCENT = (PREVIEW_HEADER_HEIGHT / A4_PAGE_HEIGHT) * 100;
-const PREVIEW_FOOTER_PERCENT = (PREVIEW_FOOTER_HEIGHT / A4_PAGE_HEIGHT) * 100;
-const PREVIEW_BODY_PERCENT = 100 - PREVIEW_HEADER_PERCENT - PREVIEW_FOOTER_PERCENT;
 
 type PreviewBlock = {
   id: string;
@@ -312,13 +309,14 @@ export function ProposalHtmlPreview({ proposal, pagesContainerRef }: ProposalHtm
         content: (
           <div className="px-6 pt-8 pb-4 text-center sm:px-10">
             <div className="inline-block">
-              <p className={`text-3xl text-slate-900 ${signatureFontClassByValue[snapshot.issuer.signatureFont]}`}>
+              <p
+                className={`text-3xl text-slate-900 ${
+                  signatureFontStyles[signatureFontClassByValue[snapshot.issuer.signatureFont]]
+                }`}
+              >
                 {snapshot.issuer.signatureText}
               </p>
-              <div
-                className="mt-2 h-px bg-slate-400"
-                style={{ width: "calc(100% + 60px)", marginLeft: "-30px" }}
-              />
+              <div className={`mt-2 h-px bg-slate-400 ${styles.signatureDivider}`} />
             </div>
             <p className="mt-2 text-sm font-medium text-slate-900">{snapshot.issuer.responsibleName}</p>
             <p className="text-sm text-slate-500">{snapshot.issuer.role}</p>
@@ -385,21 +383,18 @@ export function ProposalHtmlPreview({ proposal, pagesContainerRef }: ProposalHtm
           <div
             key={page.id}
             data-preview-page="true"
-            className="mx-auto w-full max-w-[595px] overflow-hidden border border-slate-200 bg-white shadow-[0_20px_70px_rgba(15,23,42,0.08)]"
-            style={{ aspectRatio: `${A4_PAGE_WIDTH} / ${A4_PAGE_HEIGHT}` }}
+            className={`mx-auto w-full max-w-[595px] overflow-hidden border border-slate-200 bg-white shadow-[0_20px_70px_rgba(15,23,42,0.08)] ${styles.previewPage}`}
           >
             <div
-              className="border-b border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(14,116,144,0.18),_transparent_38%),linear-gradient(135deg,#0f172a,#1e293b)] px-6 py-6 text-white"
-              style={{ height: `${PREVIEW_HEADER_PERCENT}%` }}
+              className={`border-b border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(14,116,144,0.18),_transparent_38%),linear-gradient(135deg,#0f172a,#1e293b)] px-6 py-6 text-white ${styles.previewHeader}`}
             >
               <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
                 <div>
                   <div className="flex items-center gap-3">
-                    <Image
-                      src={jcBrandConfig.assets.logoMain}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={snapshot.issuer.logoUrl || jcBrandConfig.assets.logoMain}
                       alt={`${jcBrandConfig.app.name} logo`}
-                      width={44}
-                      height={44}
                       className="h-11 w-11 rounded-xl border border-white/20 bg-white/10 object-contain p-1"
                     />
                     <p className="text-xs uppercase tracking-[0.35em] text-sky-200">{page.title}</p>
@@ -423,8 +418,7 @@ export function ProposalHtmlPreview({ proposal, pagesContainerRef }: ProposalHtm
             </div>
 
             <div
-              className="flex flex-col overflow-hidden"
-              style={{ height: `${PREVIEW_BODY_PERCENT}%` }}
+              className={`flex flex-col overflow-hidden ${styles.previewBody}`}
             >
               {page.blocks.map((block) => (
                 <div key={block.id}>{block.content}</div>
@@ -433,8 +427,7 @@ export function ProposalHtmlPreview({ proposal, pagesContainerRef }: ProposalHtm
             </div>
 
             <div
-              className="border-t border-slate-200 bg-[linear-gradient(135deg,#0f172a,#1e293b)] px-6 text-xs text-slate-200"
-              style={{ height: `${PREVIEW_FOOTER_PERCENT}%` }}
+              className={`border-t border-slate-200 bg-[linear-gradient(135deg,#0f172a,#1e293b)] px-6 text-xs text-slate-200 ${styles.previewFooter}`}
             >
               <div className="flex items-center justify-between">
                 <p>{jcBrandConfig.app.legalName}</p>

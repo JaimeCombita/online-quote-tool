@@ -24,14 +24,24 @@ export type ProposalClientInfoDTO = z.infer<typeof ProposalClientInfoSchema>;
 
 // Issuer Profile
 export const ProposalIssuerProfileSchema = z.object({
-  businessName: z.string().min(1, "Business name is required"),
-  responsibleName: z.string().min(1, "Responsible name is required"),
-  role: z.string().min(1, "Role is required"),
-  email: z.string().email("Invalid email"),
+  businessName: z.string().min(1, "El nombre de la empresa es requerido"),
+  responsibleName: z.string().min(1, "El nombre del responsable es requerido"),
+  role: z.string().min(1, "El cargo es requerido"),
+  email: z.string().email("El email debe ser valido"),
   phone: z.string().optional().default(""),
   website: z.string().url().optional().or(z.literal("")),
+  logoUrl: z.string().optional().default(""),
   signatureText: z.string().optional().default(""),
-  signatureFont: z.enum(["script-elegant", "script-formal", "script-hand"]).default("script-elegant"),
+  signatureFont: z
+    .enum([
+      "script-elegant",
+      "script-formal",
+      "script-hand",
+      "serif-classic",
+      "sans-clean",
+      "modern-sign",
+    ])
+    .default("script-elegant"),
 });
 
 export type ProposalIssuerProfileDTO = z.infer<typeof ProposalIssuerProfileSchema>;
@@ -39,11 +49,11 @@ export type ProposalIssuerProfileDTO = z.infer<typeof ProposalIssuerProfileSchem
 // Investment Row
 export const InvestmentRowSchema = z.object({
   id: z.string(),
-  concept: z.string().min(1, "Concept is required"),
+  concept: z.string().min(1, "El concepto es requerido"),
   description: z.string().optional().default(""),
-  quantity: z.number().min(0, "Quantity must be positive"),
-  unitPrice: z.number().min(0, "Unit price must be positive"),
-  taxRate: z.number().min(0).max(100, "Tax rate must be between 0 and 100"),
+  quantity: z.number().min(0, "La cantidad no puede ser negativa"),
+  unitPrice: z.number().min(0, "El valor unitario no puede ser negativo"),
+  taxRate: z.number().min(0).max(100, "El impuesto debe estar entre 0 y 100"),
 });
 
 export type InvestmentRowDTO = z.infer<typeof InvestmentRowSchema>;
@@ -51,7 +61,7 @@ export type InvestmentRowDTO = z.infer<typeof InvestmentRowSchema>;
 // Investment
 export const ProposalInvestmentSchema = z.object({
   enabled: z.boolean().default(false),
-  title: z.string().default("Investment"),
+  title: z.string().default("Inversion"),
   rows: z.array(InvestmentRowSchema).default([]),
   note: z.string().optional().default(""),
   offerValidityDays: z.number().optional().default(30),
@@ -62,7 +72,7 @@ export type ProposalInvestmentDTO = z.infer<typeof ProposalInvestmentSchema>;
 // Section
 export const ProposalSectionSchema = z.object({
   id: z.string(),
-  title: z.string().min(1, "Section title is required"),
+  title: z.string().min(1, "El titulo de la seccion es requerido"),
   content: z.string().optional().default(""),
   kind: z.enum(["text", "bullets", "highlight", "table", "investment"]),
   isVisible: z.boolean().default(true),
@@ -120,7 +130,7 @@ export type InvestmentFormDTO = z.infer<typeof InvestmentFormSchema>;
 
 // Section form state (for creating/editing)
 export const SectionFormSchema = z.object({
-  title: z.string().min(1, "Section title is required"),
+  title: z.string().min(1, "El titulo de la seccion es requerido"),
   content: z.string().optional().default(""),
   kind: z.enum(["text", "bullets", "highlight", "table", "investment"]),
 });

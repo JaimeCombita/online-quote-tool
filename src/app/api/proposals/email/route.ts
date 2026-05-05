@@ -5,8 +5,19 @@ import {
   sanitizeFileName,
 } from "@/modules/proposals/infrastructure/pdf/proposalPdfDocument";
 import { jcBrandConfig } from "@/modules/shared/branding/brand.config";
+import {
+  applyRateLimit,
+  cleanupRateLimitBuckets,
+  getPayloadTooLargeResponse,
+  getRateLimitedResponse,
+  isPayloadWithinLimit,
+} from "@/modules/shared/infrastructure/security/requestGuards";
 
 export const runtime = "nodejs";
+
+const EMAIL_RATE_LIMIT_MAX_REQUESTS = Number(process.env.RATE_LIMIT_EMAIL_MAX_REQUESTS ?? "6");
+const EMAIL_RATE_LIMIT_WINDOW_MS = Number(process.env.RATE_LIMIT_EMAIL_WINDOW_MS ?? String(10 * 60 * 1000));
+const EMAIL_PAYLOAD_MAX_BYTES = Number(process.env.EMAIL_PAYLOAD_MAX_BYTES ?? String(1_000_000));
 
 interface SendProposalEmailPayload {
   proposal?: ProposalProps;
@@ -52,14 +63,29 @@ const buildDefaultMessage = (proposal: Proposal): string => {
 
 export async function POST(request: Request): Promise<Response> {
   try {
+    cleanupRateLimitBuckets();
+
+    const limitDecision = applyRateLimit(request, "api:proposals:email", {
+      maxRequests: Number.isFinite(EMAIL_RATE_LIMIT_MAX_REQUESTS) ? EMAIL_RATE_LIMIT_MAX_REQUESTS : 6,
+      windowMs: Number.isFinite(EMAIL_RATE_LIMIT_WINDOW_MS) ? EMAIL_RATE_LIMIT_WINDOW_MS : 10 * 60 * 1000,
+    });
+
+    if (!limitDecision.allowed) {
+      return getRateLimitedResponse(limitDecision);
+    }
+
+    if (!isPayloadWithinLimit(request, EMAIL_PAYLOAD_MAX_BYTES)) {
+      return getPayloadTooLargeResponse();
+    }
+
     const payload = (await request.json()) as SendProposalEmailPayload;
 
     if (!payload.proposal) {
-      return Response.json({ error: "Proposal payload is required" }, { status: 400 });
+      return Response.json({ error: "El payload de la propuesta es requerido" }, { status: 400 });
     }
 
     if (!payload.to || !isValidEmail(payload.to)) {
-      return Response.json({ error: "A valid recipient email is required" }, { status: 400 });
+      return Response.json({ error: "Debes ingresar un correo destinatario valido" }, { status: 400 });
     }
 
     const proposal = Proposal.rehydrate(payload.proposal);
@@ -68,7 +94,7 @@ export async function POST(request: Request): Promise<Response> {
     if (!validation.isValid) {
       return Response.json(
         {
-          error: "Proposal does not meet MVP PDF requirements",
+          error: "La propuesta no cumple los requisitos para generar/enviar PDF",
           issues: validation.issues,
         },
         { status: 400 },
@@ -79,7 +105,7 @@ export async function POST(request: Request): Promise<Response> {
       return Response.json(
         {
           error:
-            "RESEND_API_KEY is not configured. Configure environment variables before sending emails.",
+            "RESEND_API_KEY no esta configurada. Configura las variables de entorno antes de enviar correos.",
         },
         { status: 500 },
       );
@@ -90,7 +116,7 @@ export async function POST(request: Request): Promise<Response> {
       return Response.json(
         {
           error:
-            "RESEND_FROM_EMAIL is not configured with a valid sender email.",
+            "RESEND_FROM_EMAIL no esta configurado con un correo remitente valido.",
         },
         { status: 500 },
       );
@@ -133,7 +159,7 @@ export async function POST(request: Request): Promise<Response> {
 
     return Response.json({ ok: true, id: resendResult.data?.id ?? null }, { status: 200 });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Could not send proposal email at this time";
+    const message = error instanceof Error ? error.message : "No fue posible enviar el correo en este momento";
     return Response.json(
       { error: message },
       { status: 500 },

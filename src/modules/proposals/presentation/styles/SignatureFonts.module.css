@@ -1,0 +1,28 @@
+.scriptElegant {
+  font-family: "Brush Script MT", "Lucida Handwriting", cursive;
+  font-style: italic;
+  letter-spacing: 0.02em;
+}
+
+.scriptFormal {
+  font-family: "Times New Roman", Georgia, serif;
+  font-style: italic;
+}
+
+.scriptHand {
+  font-family: "Segoe Script", "Comic Sans MS", cursive;
+}
+
+.serifClassic {
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+.sansClean {
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+}
+
+.modernSign {
+  font-family: "Palatino Linotype", "Book Antiqua", Palatino, serif;
+  font-style: italic;
+  font-weight: 600;
+}

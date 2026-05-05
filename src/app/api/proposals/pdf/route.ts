@@ -3,15 +3,41 @@ import {
   generateProposalPdf,
   sanitizeFileName,
 } from "@/modules/proposals/infrastructure/pdf/proposalPdfDocument";
+import {
+  applyRateLimit,
+  cleanupRateLimitBuckets,
+  getPayloadTooLargeResponse,
+  getRateLimitedResponse,
+  isPayloadWithinLimit,
+} from "@/modules/shared/infrastructure/security/requestGuards";
 
 export const runtime = "nodejs";
 
+const PDF_RATE_LIMIT_MAX_REQUESTS = Number(process.env.RATE_LIMIT_PDF_MAX_REQUESTS ?? "20");
+const PDF_RATE_LIMIT_WINDOW_MS = Number(process.env.RATE_LIMIT_PDF_WINDOW_MS ?? String(5 * 60 * 1000));
+const PDF_PAYLOAD_MAX_BYTES = Number(process.env.PDF_PAYLOAD_MAX_BYTES ?? String(1_000_000));
+
 export async function POST(request: Request): Promise<Response> {
   try {
+    cleanupRateLimitBuckets();
+
+    const limitDecision = applyRateLimit(request, "api:proposals:pdf", {
+      maxRequests: Number.isFinite(PDF_RATE_LIMIT_MAX_REQUESTS) ? PDF_RATE_LIMIT_MAX_REQUESTS : 20,
+      windowMs: Number.isFinite(PDF_RATE_LIMIT_WINDOW_MS) ? PDF_RATE_LIMIT_WINDOW_MS : 5 * 60 * 1000,
+    });
+
+    if (!limitDecision.allowed) {
+      return getRateLimitedResponse(limitDecision);
+    }
+
+    if (!isPayloadWithinLimit(request, PDF_PAYLOAD_MAX_BYTES)) {
+      return getPayloadTooLargeResponse();
+    }
+
     const body = (await request.json()) as { proposal?: ProposalProps };
 
     if (!body.proposal) {
-      return Response.json({ error: "Proposal payload is required" }, { status: 400 });
+      return Response.json({ error: "El payload de la propuesta es requerido" }, { status: 400 });
     }
 
     const proposal = Proposal.rehydrate(body.proposal);
@@ -20,7 +46,7 @@ export async function POST(request: Request): Promise<Response> {
     if (!validation.isValid) {
       return Response.json(
         {
-          error: "Proposal does not meet MVP PDF requirements",
+          error: "La propuesta no cumple los requisitos para generar PDF",
           issues: validation.issues,
         },
         { status: 400 },
@@ -45,7 +71,7 @@ export async function POST(request: Request): Promise<Response> {
     });
   } catch {
     return Response.json(
-      { error: "Could not generate PDF at this time" },
+      { error: "No fue posible generar el PDF en este momento" },
       { status: 500 },
     );
   }

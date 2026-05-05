@@ -1,8 +1,7 @@
 "use client";
 
-import { GeneralFormDTO, GeneralFormSchema, hasGeneralFormChanges } from "../../application/dtos/schemas";
-import { useState, useCallback } from "react";
-import { ZodError } from "zod";
+import { GeneralFormDTO } from "../../application/dtos/schemas";
+import { useGeneralDataForm } from "../hooks/forms/useGeneralDataForm";
 
 interface GeneralDataFormProps {
   initialData: {
@@ -22,45 +21,18 @@ interface GeneralDataFormProps {
 }
 
 export function GeneralDataForm({ initialData, onSubmit, isLoading = false }: GeneralDataFormProps) {
-  const [formData, setFormData] = useState(initialData);
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const hasChanges = hasGeneralFormChanges(initialData, formData);
-
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    // Clear error for this field when user starts typing
-    if (errors[name]) {
-      setErrors((prev) => {
-        const newErrors = { ...prev };
-        delete newErrors[name];
-        return newErrors;
-      });
-    }
-  }, [errors]);
-
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    setErrors({});
-
-    try {
-      const validated = GeneralFormSchema.parse(formData);
-      await onSubmit(validated);
-    } catch (error) {
-      if (error instanceof ZodError) {
-        const fieldErrors: Record<string, string> = {};
-        error.issues.forEach((err) => {
-          const path = err.path.join(".");
-          fieldErrors[path] = err.message;
-        });
-        setErrors(fieldErrors);
-      }
-    } finally {
-      setIsSubmitting(false);
-    }
-  }, [formData, onSubmit]);
+  const {
+    formData,
+    errors,
+    isSubmitting,
+    hasChanges,
+    handleChange,
+    handleIssueDateChange,
+    handleSubmit,
+  } = useGeneralDataForm({
+    initialData,
+    onSubmit,
+  });
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -173,10 +145,7 @@ export function GeneralDataForm({ initialData, onSubmit, isLoading = false }: Ge
             type="date"
             name="issueDate"
             value={formData.issueDate.split("T")[0]}
-            onChange={(e) => {
-              const newDate = new Date(e.target.value).toISOString();
-              setFormData((prev) => ({ ...prev, issueDate: newDate }));
-            }}
+            onChange={(e) => handleIssueDateChange(e.target.value)}
             className="mt-1 block w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm"
             disabled={isSubmitting || isLoading}
           />

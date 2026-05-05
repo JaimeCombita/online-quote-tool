@@ -55,8 +55,15 @@ export interface ProposalIssuerProfile {
   email: string;
   phone?: string;
   website?: string;
+  logoUrl?: string;
   signatureText: string;
-  signatureFont: "script-elegant" | "script-formal" | "script-hand";
+  signatureFont:
+    | "script-elegant"
+    | "script-formal"
+    | "script-hand"
+    | "serif-classic"
+    | "sans-clean"
+    | "modern-sign";
 }
 
 export interface ProposalProps {
@@ -76,7 +83,8 @@ export type ProposalPdfValidationCode =
   | "missing-title"
   | "missing-client-name"
   | "missing-issue-date"
-  | "missing-visible-section";
+  | "missing-visible-section"
+  | "expired-offer-validity";
 
 export interface ProposalPdfValidationIssue {
   code: ProposalPdfValidationCode;
@@ -95,6 +103,7 @@ const defaultIssuerProfile: ProposalIssuerProfile = {
   email: "hola@jcengine.com",
   phone: "+57 000 000 0000",
   website: "https://jcengine.com",
+  logoUrl: "",
   signatureText: "Jaime Combita V.",
   signatureFont: "script-elegant",
 };
@@ -314,6 +323,25 @@ export class Proposal {
         code: "missing-visible-section",
         message: "Debes tener al menos una seccion activa para generar el PDF.",
       });
+    }
+
+    if (this.props.investment.enabled) {
+      const issueDate = new Date(this.props.metadata.issueDate);
+      const isIssueDateValid = !Number.isNaN(issueDate.getTime());
+      const offerValidityDays = this.props.investment.offerValidityDays ?? 30;
+
+      if (isIssueDateValid) {
+        const now = new Date();
+        const daysSinceIssue = Math.floor((now.getTime() - issueDate.getTime()) / (1000 * 60 * 60 * 24));
+        const isExpired = offerValidityDays - daysSinceIssue <= 0;
+
+        if (isExpired) {
+          issues.push({
+            code: "expired-offer-validity",
+            message: "La vigencia de la oferta esta expirada. Actualiza la fecha o la vigencia para continuar.",
+          });
+        }
+      }
     }
 
     return {

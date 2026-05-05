@@ -1,0 +1,20 @@
+.previewPage {
+  aspect-ratio: 595 / 842;
+}
+
+.previewHeader {
+  height: 15.2019%;
+}
+
+.previewBody {
+  height: 80.7601%;
+}
+
+.previewFooter {
+  height: 4.038%;
+}
+
+.signatureDivider {
+  width: calc(100% + 60px);
+  margin-left: -30px;
+}
