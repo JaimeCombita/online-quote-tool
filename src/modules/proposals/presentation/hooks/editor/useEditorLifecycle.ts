@@ -5,7 +5,10 @@ import {
   loadCompanySettings,
   saveCompanySettings,
 } from "../../../infrastructure/browser/companySettings";
-import { mapIssuerFormData } from "../../../application/mappers/companySettingsMapper";
+import {
+  mapIssuerFormData,
+  sanitizeIssuerForDraftPersistence,
+} from "../../../application/mappers/companySettingsMapper";
 import { mapProposalEmailDefaults } from "../../../application/mappers/proposalEditorMapper";
 import { Proposal } from "../../../domain/entities/Proposal";
 
@@ -39,7 +42,7 @@ export const useEditorLifecycle = ({
         loadedDrafts.map((draft) =>
           proposalModule.updateProposalDraft.execute({
             proposalId: draft.snapshot.id,
-            issuer: settings,
+            issuer: sanitizeIssuerForDraftPersistence(settings),
           }),
         ),
       );
@@ -72,7 +75,7 @@ export const useEditorLifecycle = ({
         const issuerToApply = mapIssuerFormData(storedSettings ?? current.snapshot.issuer);
         const proposalWithGlobalIssuer = await proposalModule.updateProposalDraft.execute({
           proposalId: current.snapshot.id,
-          issuer: issuerToApply,
+          issuer: sanitizeIssuerForDraftPersistence(issuerToApply),
         });
 
         const emailDefaults = mapProposalEmailDefaults(proposalWithGlobalIssuer);

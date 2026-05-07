@@ -13,9 +13,10 @@ interface IssuerFormProps {
   initialData: IssuerFormInitialData;
   onSubmit: (data: IssuerFormDTO) => Promise<void>;
   isLoading?: boolean;
+  onDirtyChange?: (hasChanges: boolean) => void;
 }
 
-export function IssuerForm({ initialData, onSubmit, isLoading = false }: IssuerFormProps) {
+export function IssuerForm({ initialData, onSubmit, isLoading = false, onDirtyChange }: IssuerFormProps) {
   const {
     formData,
     errors,
@@ -27,6 +28,7 @@ export function IssuerForm({ initialData, onSubmit, isLoading = false }: IssuerF
   } = useIssuerForm({
     initialData,
     onSubmit,
+    onDirtyChange,
   });
 
   return (

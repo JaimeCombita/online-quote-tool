@@ -242,6 +242,11 @@ export function SectionForm({
       {(formData.kind === "text" || formData.kind === "highlight" || formData.kind === "investment") && (
         <div>
           <label className="block text-sm font-medium text-slate-700">Contenido</label>
+          {formData.kind === "text" && (
+            <p className="mt-1 text-xs text-slate-500">
+              Tip: usa <strong>**Subtitulo**</strong> en una linea para mostrarla como subtitulo en negrilla y azul en la vista previa y PDF.
+            </p>
+          )}
           <textarea
             name="content"
             value={formData.content}

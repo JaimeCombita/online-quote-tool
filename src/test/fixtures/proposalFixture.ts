@@ -58,6 +58,7 @@ export const buildProposalSnapshot = (overrides: Partial<ProposalProps> = {}): P
       ],
       note: "Nota comercial",
       offerValidityDays: 30,
+      showTotals: true,
       ...overrides.investment,
     },
     closingText: "Gracias por la oportunidad",

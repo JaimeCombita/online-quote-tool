@@ -4,9 +4,9 @@ import { JcEngineBrandFrame } from "@/modules/shared/presentation/components/JcE
 export default function Home() {
   return (
     <JcEngineBrandFrame
-      pageTag="Fase 1 · Propuestas"
+      pageTag="Propuestas Comerciales"
       pageTitle="Generador de propuestas comerciales"
-      pageSubtitle="Crea, organiza y valida propuestas con almacenamiento local, vista previa HTML y flujo preparado para PDF bajo la linea visual corporativa de JC Engine."
+      pageSubtitle="Crea, organiza y valida propuestas con almacenamiento local, vista previa y flujo preparado para PDF."
     >
         <ProposalDashboard />
     </JcEngineBrandFrame>

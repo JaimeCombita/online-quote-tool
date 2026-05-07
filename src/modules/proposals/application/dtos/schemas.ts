@@ -65,6 +65,7 @@ export const ProposalInvestmentSchema = z.object({
   rows: z.array(InvestmentRowSchema).default([]),
   note: z.string().optional().default(""),
   offerValidityDays: z.number().optional().default(30),
+  showTotals: z.boolean().optional().default(true),
 });
 
 export type ProposalInvestmentDTO = z.infer<typeof ProposalInvestmentSchema>;

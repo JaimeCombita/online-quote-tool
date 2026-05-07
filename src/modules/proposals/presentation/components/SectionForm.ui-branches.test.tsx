@@ -57,6 +57,9 @@ describe("SectionForm UI branches", () => {
 
     render(<SectionForm onSubmit={vi.fn()} onCancel={onCancel} />);
 
+    expect(screen.getByText(/usa/i)).toBeInTheDocument();
+    expect(screen.getByText("**Subtitulo**")).toBeInTheDocument();
+
     fireEvent.change(screen.getByDisplayValue("Titulo"), { target: { value: "Nuevo" } });
     expect(hookState.handleChange).toHaveBeenCalled();
 

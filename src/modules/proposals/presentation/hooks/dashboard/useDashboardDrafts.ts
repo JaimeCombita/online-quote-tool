@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createProposalModule } from "../../../composition/proposalModule";
 import { Proposal } from "../../../domain/entities/Proposal";
 import { IssuerFormDTO } from "../../../application/dtos/schemas";
+import { sanitizeIssuerForDraftPersistence } from "../../../application/mappers/companySettingsMapper";
 
 interface UseDashboardDraftsParams {
   proposalModule: ReturnType<typeof createProposalModule>;
@@ -44,7 +45,7 @@ export const useDashboardDrafts = ({
       const newDraft = await proposalModule.createProposalDraft.execute();
       const newDraftWithSettings = await proposalModule.updateProposalDraft.execute({
         proposalId: newDraft.snapshot.id,
-        issuer: companySettings,
+        issuer: sanitizeIssuerForDraftPersistence(companySettings),
       });
       setDrafts((prev) => [...prev, newDraftWithSettings]);
       setError(null);
@@ -58,10 +59,6 @@ export const useDashboardDrafts = ({
 
   const handleDelete = useCallback(
     async (id: string) => {
-      if (!confirm("¿Estás seguro de que quieres eliminar este borrador?")) {
-        return;
-      }
-
       try {
         setBlockingMessage("Eliminando propuesta...");
         await proposalModule.deleteProposalDraft.execute(id);

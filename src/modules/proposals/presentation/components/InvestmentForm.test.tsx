@@ -7,6 +7,7 @@ const initialData = {
   rows: [],
   note: "",
   offerValidityDays: 30,
+  showTotals: true,
 };
 
 describe("InvestmentForm", () => {
@@ -59,6 +60,7 @@ describe("InvestmentForm", () => {
           rows: [{ id: "r1", concept: "Dev", description: "", quantity: 1, unitPrice: 1000, taxRate: 0 }],
           note: "Condiciones especiales",
           offerValidityDays: 15,
+          showTotals: false,
         }}
         currency="USD"
         onSubmit={vi.fn()}

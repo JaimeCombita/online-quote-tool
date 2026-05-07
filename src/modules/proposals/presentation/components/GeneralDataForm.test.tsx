@@ -15,6 +15,13 @@ const initialData = {
 };
 
 describe("GeneralDataForm", () => {
+  it("shows required indicator for client email", () => {
+    render(<GeneralDataForm initialData={initialData} onSubmit={vi.fn()} />);
+    const emailLabel = screen.getByText("Email del cliente").closest("label");
+    expect(emailLabel).not.toBeNull();
+    expect(emailLabel).toHaveTextContent("*");
+  });
+
   it("disables submit when no changes", () => {
     render(<GeneralDataForm initialData={initialData} onSubmit={vi.fn()} />);
     expect(screen.getByRole("button", { name: "Guardar cambios" })).toBeDisabled();

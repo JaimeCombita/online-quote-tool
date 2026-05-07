@@ -8,6 +8,7 @@ interface JcEngineBrandFrameProps {
   pageTitle: string;
   pageSubtitle: string;
   pageTag?: string;
+  topLeftContent?: ReactNode;
   topRightContent?: ReactNode;
 }
 
@@ -16,6 +17,7 @@ export function JcEngineBrandFrame({
   pageTitle,
   pageSubtitle,
   pageTag = "JC Engine",
+  topLeftContent,
   topRightContent,
 }: JcEngineBrandFrameProps) {
   return (
@@ -56,6 +58,7 @@ export function JcEngineBrandFrame({
 
       <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-6 py-8 sm:py-10">
         <section className="jc-hero-gradient mb-6 rounded-3xl border border-[var(--jc-primary-400)]/20 p-7 text-white shadow-[0_18px_50px_rgba(15,23,42,0.24)] sm:p-9">
+          {topLeftContent && <div className="mb-4">{topLeftContent}</div>}
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="text-xs uppercase tracking-[0.28em] text-[var(--jc-primary-100)]">{pageTag}</p>
@@ -113,9 +116,10 @@ export function BackToDashboardLink() {
   return (
     <Link
       href="/"
-      className="inline-flex items-center rounded-lg border border-white/30 bg-white/10 px-3 py-2 text-sm font-medium text-white transition hover:bg-white/20"
+      className="inline-flex items-center gap-2 rounded-lg border border-white/30 bg-white/20 px-3 py-2 text-sm font-semibold text-white transition hover:bg-white/30"
     >
-      ← Volver al dashboard
+      <span aria-hidden="true">←</span>
+      Volver al dashboard
     </Link>
   );
 }

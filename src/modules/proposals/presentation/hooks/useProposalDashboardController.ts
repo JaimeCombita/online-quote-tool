@@ -24,13 +24,17 @@ export const useProposalDashboardController = () => {
 
   const {
     companySettings,
+    companySettingsImportInputRef,
     isCompanySettingsOpen,
     setIsCompanySettingsOpen,
     handleCompanySettingsSubmit,
+    handleExportCompanySettings,
+    handleImportCompanySettings,
   } = useDashboardCompanySettings({
     proposalModule,
     setDrafts,
     setBlockingMessage,
+    setError,
   });
 
   const {
@@ -57,9 +61,12 @@ export const useProposalDashboardController = () => {
     setIsCompanySettingsOpen,
     blockingMessage,
     companySettings,
+    companySettingsImportInputRef,
     importJsonInputRef,
     handleCreateNew: handleCreateNewWithCompanySettings,
     handleCompanySettingsSubmit,
+    handleExportCompanySettings,
+    handleImportCompanySettings,
     handleDelete,
     handleExportAllJson,
     handleExportSingleJson,

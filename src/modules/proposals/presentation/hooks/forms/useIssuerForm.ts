@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { IssuerFormDTO, IssuerFormSchema } from "../../../application/dtos/schemas";
 import { ZodError } from "zod";
 
@@ -23,6 +23,7 @@ export interface IssuerFormInitialData {
 interface UseIssuerFormParams {
   initialData: IssuerFormInitialData;
   onSubmit: (data: IssuerFormDTO) => Promise<void>;
+  onDirtyChange?: (hasChanges: boolean) => void;
 }
 
 export const signatureFontOptions: Array<{
@@ -78,12 +79,16 @@ const hasIssuerFormChanges = (original: IssuerFormInitialData, current: IssuerFo
   );
 };
 
-export const useIssuerForm = ({ initialData, onSubmit }: UseIssuerFormParams) => {
+export const useIssuerForm = ({ initialData, onSubmit, onDirtyChange }: UseIssuerFormParams) => {
   const [formData, setFormData] = useState(initialData);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const hasChanges = hasIssuerFormChanges(initialData, formData);
+
+  useEffect(() => {
+    onDirtyChange?.(hasChanges);
+  }, [hasChanges, onDirtyChange]);
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {

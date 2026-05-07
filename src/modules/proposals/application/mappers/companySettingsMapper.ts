@@ -12,3 +12,9 @@ export const mapIssuerFormData = (settings?: Partial<IssuerFormDTO>): IssuerForm
   signatureText: settings?.signatureText ?? defaultCompanySettings.signatureText,
   signatureFont: settings?.signatureFont ?? defaultCompanySettings.signatureFont,
 });
+
+export const sanitizeIssuerForDraftPersistence = (settings: IssuerFormDTO): IssuerFormDTO => ({
+  ...settings,
+  // Avoid duplicating large base64 images inside every draft stored in localStorage.
+  logoUrl: settings.logoUrl.startsWith("data:") ? "" : settings.logoUrl,
+});

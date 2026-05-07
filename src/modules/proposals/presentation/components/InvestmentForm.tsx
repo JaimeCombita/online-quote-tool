@@ -53,6 +53,18 @@ export function InvestmentForm({ initialData, currency, onSubmit }: InvestmentFo
           Incluir bloque de inversion
         </label>
 
+        <label className="flex items-center gap-2 text-sm text-slate-700">
+          <input
+            type="checkbox"
+            checked={formData.showTotals ?? true}
+            onChange={(event) => {
+              setFormData((current) => ({ ...current, showTotals: event.target.checked }));
+            }}
+            className="h-4 w-4 rounded border-slate-300 text-sky-700"
+          />
+          Incluir seccion de totales
+        </label>
+
         <div>
           <label className="block text-sm font-medium text-slate-700">Titulo del bloque</label>
           <input

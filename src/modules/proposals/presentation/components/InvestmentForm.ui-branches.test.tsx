@@ -17,6 +17,7 @@ const hookState = {
     ],
     note: "Nota",
     offerValidityDays: 15,
+    showTotals: true,
   },
   setFormData: vi.fn(),
   isSubmitting: false,
@@ -58,7 +59,7 @@ describe("InvestmentForm UI branches", () => {
   it("executes field and row handlers", () => {
     render(
       <InvestmentForm
-        initialData={{ enabled: false, title: "", rows: [], note: "", offerValidityDays: 30 }}
+        initialData={{ enabled: false, title: "", rows: [], note: "", offerValidityDays: 30, showTotals: true }}
         currency="COP"
         onSubmit={vi.fn()}
       />,
@@ -67,10 +68,13 @@ describe("InvestmentForm UI branches", () => {
     fireEvent.click(screen.getByRole("checkbox", { name: /incluir bloque de inversion/i }));
     expect(hookState.setFormData).toHaveBeenCalled();
 
+    fireEvent.click(screen.getByRole("checkbox", { name: /incluir seccion de totales/i }));
+    expect(hookState.setFormData).toHaveBeenCalledTimes(2);
+
     fireEvent.change(screen.getByDisplayValue("Inversion test"), { target: { value: "Nuevo titulo" } });
     fireEvent.change(screen.getByDisplayValue("Nota"), { target: { value: "Nueva nota" } });
     fireEvent.change(screen.getByDisplayValue("15"), { target: { value: "20" } });
-    expect(hookState.setFormData).toHaveBeenCalledTimes(4);
+    expect(hookState.setFormData).toHaveBeenCalledTimes(5);
 
     fireEvent.click(screen.getByRole("button", { name: "+ Agregar fila" }));
     expect(hookState.addRow).toHaveBeenCalled();
@@ -106,7 +110,7 @@ describe("InvestmentForm UI branches", () => {
 
     render(
       <InvestmentForm
-        initialData={{ enabled: false, title: "", rows: [], note: "", offerValidityDays: 30 }}
+        initialData={{ enabled: false, title: "", rows: [], note: "", offerValidityDays: 30, showTotals: true }}
         currency="USD"
         onSubmit={vi.fn()}
       />,
@@ -121,7 +125,7 @@ describe("InvestmentForm UI branches", () => {
 
     render(
       <InvestmentForm
-        initialData={{ enabled: false, title: "", rows: [], note: "", offerValidityDays: 30 }}
+        initialData={{ enabled: false, title: "", rows: [], note: "", offerValidityDays: 30, showTotals: true }}
         currency="COP"
         onSubmit={vi.fn()}
       />,

@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { useCallback, useState } from "react";
 import { useProposalEditorController } from "../hooks/useProposalEditorController";
 import { EditorTab } from "../types/editor";
 import { GeneralDataForm } from "./GeneralDataForm";
@@ -7,6 +9,7 @@ import { InvestmentForm } from "./InvestmentForm";
 import { IssuerForm } from "./IssuerForm";
 import { ProposalPdfReadinessPanel } from "./ProposalPdfReadinessPanel";
 import { BlockingLoaderOverlay } from "../../../shared/presentation/components/BlockingLoaderOverlay";
+import { ConfirmationDialog } from "../../../shared/presentation/components/ConfirmationDialog";
 import { ProposalEditorSectionsTab } from "./ProposalEditorSectionsTab";
 import { ProposalEditorClosingTab } from "./ProposalEditorClosingTab";
 import { ProposalEditorPreviewTab } from "./ProposalEditorPreviewTab";
@@ -16,6 +19,8 @@ interface ProposalEditorProps {
 }
 
 export function ProposalEditor({ proposalId }: ProposalEditorProps) {
+  const [hasUnsavedCompanySettings, setHasUnsavedCompanySettings] = useState(false);
+  const [isCloseCompanySettingsConfirmOpen, setIsCloseCompanySettingsConfirmOpen] = useState(false);
   const {
     proposal,
     isLoading,
@@ -61,6 +66,21 @@ export function ProposalEditor({ proposalId }: ProposalEditorProps) {
     handleSendEmail,
   } = useProposalEditorController({ proposalId });
 
+  const requestCompanySettingsClose = useCallback(() => {
+    if (hasUnsavedCompanySettings) {
+      setIsCloseCompanySettingsConfirmOpen(true);
+      return;
+    }
+
+    setIsCompanySettingsOpen(false);
+  }, [hasUnsavedCompanySettings, setIsCompanySettingsOpen]);
+
+  const confirmCompanySettingsClose = useCallback(() => {
+    setIsCloseCompanySettingsConfirmOpen(false);
+    setHasUnsavedCompanySettings(false);
+    setIsCompanySettingsOpen(false);
+  }, [setIsCompanySettingsOpen]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -82,6 +102,18 @@ export function ProposalEditor({ proposalId }: ProposalEditorProps) {
 
   return (
     <div className="space-y-4">
+      <div className="sticky top-2 z-20">
+        <div className="inline-flex rounded-lg border border-slate-300 bg-white/95 px-2 py-1 shadow-sm backdrop-blur">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 rounded-md px-2 py-1 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+          >
+            <span aria-hidden="true">←</span>
+            Volver
+          </Link>
+        </div>
+      </div>
+
       {/* Header */}
       <div className="rounded-lg border border-slate-200 bg-white p-4">
         <div className="flex items-start justify-between gap-4">
@@ -243,17 +275,22 @@ export function ProposalEditor({ proposalId }: ProposalEditorProps) {
 
       {isCompanySettingsOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4">
-          <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-xl border border-slate-200 bg-white p-5 shadow-xl">
-            <div className="mb-4 flex items-center justify-between">
+          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl sm:max-w-4xl">
+            <div className="flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4">
               <h2 className="text-lg font-semibold text-slate-900">Configuracion general de empresa</h2>
               <button
                 type="button"
-                onClick={() => setIsCompanySettingsOpen(false)}
-                className="rounded border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:bg-slate-50"
+                onClick={requestCompanySettingsClose}
+                aria-label="Cerrar"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-red-200 text-red-600 transition hover:bg-red-50"
               >
-                Cerrar
+                <svg aria-hidden="true" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 6 6 18" />
+                  <path d="m6 6 12 12" />
+                </svg>
               </button>
             </div>
+            <div className="overflow-y-auto px-5 py-5">
             <IssuerForm
               initialData={{
                 ...companySettings,
@@ -261,14 +298,30 @@ export function ProposalEditor({ proposalId }: ProposalEditorProps) {
                 website: companySettings.website ?? "",
                 logoUrl: companySettings.logoUrl ?? "",
               }}
-              onSubmit={handleIssuerSubmit}
+              onSubmit={async (data) => {
+                await handleIssuerSubmit(data);
+                setHasUnsavedCompanySettings(false);
+              }}
               isLoading={isLoading}
+              onDirtyChange={setHasUnsavedCompanySettings}
             />
+            </div>
           </div>
         </div>
       )}
 
       <BlockingLoaderOverlay isOpen={Boolean(blockingMessage)} message={blockingMessage ?? undefined} />
+
+      <ConfirmationDialog
+        isOpen={isCloseCompanySettingsConfirmOpen}
+        title="Descartar cambios"
+        description="Hay cambios sin guardar en la configuracion de empresa. Si cierras ahora, se perderan."
+        confirmText="Si"
+        cancelText="No"
+        confirmVariant="danger"
+        onConfirm={confirmCompanySettingsClose}
+        onCancel={() => setIsCloseCompanySettingsConfirmOpen(false)}
+      />
     </div>
   );
 }

@@ -18,6 +18,5 @@ describe("Editor page", () => {
     render(<EditorPage params={Promise.resolve({ id: "ignored" })} />);
 
     expect(screen.getByText("Editor:abc-123")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /volver al dashboard/i })).toHaveAttribute("href", "/");
   });
 });

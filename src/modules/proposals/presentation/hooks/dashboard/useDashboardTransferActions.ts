@@ -4,6 +4,25 @@ import { Proposal, ProposalProps } from "../../../domain/entities/Proposal";
 import { downloadTextFile } from "../../../application/services/fileDownload";
 import { prepareWhatsAppRequest } from "../../../application/services/proposalApiClient";
 
+const slugifySegment = (value: string): string =>
+  value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .toLowerCase();
+
+const getProposalExportFileName = (draft: Proposal): string => {
+  const clientLabel =
+    draft.snapshot.client.name ||
+    draft.snapshot.client.company ||
+    draft.snapshot.client.contactName ||
+    "cliente";
+
+  const normalizedClientLabel = slugifySegment(clientLabel) || "cliente";
+  return `Propuesta-${normalizedClientLabel}.json`;
+};
+
 interface UseDashboardTransferActionsParams {
   proposalModule: ReturnType<typeof createProposalModule>;
   loadDrafts: () => Promise<void>;
@@ -34,11 +53,11 @@ export const useDashboardTransferActions = ({
   }, [proposalModule, setBlockingMessage, setError]);
 
   const handleExportSingleJson = useCallback(
-    async (proposalId: string) => {
+    async (draft: Proposal) => {
       try {
         setBlockingMessage("Exportando propuesta en JSON...");
-        const json = await proposalModule.exportProposal.execute(proposalId);
-        downloadTextFile(json, `propuesta-${proposalId}.json`);
+        const json = await proposalModule.exportProposal.execute(draft.snapshot.id);
+        downloadTextFile(json, getProposalExportFileName(draft));
         setError(null);
       } catch (err) {
         setError(err instanceof Error ? err.message : "No fue posible exportar la propuesta.");

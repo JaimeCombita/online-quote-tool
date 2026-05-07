@@ -25,7 +25,10 @@ interface UseInvestmentFormParams {
 }
 
 export const useInvestmentForm = ({ initialData, onSubmit }: UseInvestmentFormParams) => {
-  const [formData, setFormData] = useState<ProposalInvestment>(initialData);
+  const [formData, setFormData] = useState<ProposalInvestment>({
+    ...initialData,
+    showTotals: initialData.showTotals ?? true,
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const idGenerator = useMemo(() => new UuidGenerator(), []);

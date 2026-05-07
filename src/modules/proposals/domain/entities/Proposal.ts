@@ -30,6 +30,7 @@ export interface ProposalInvestment {
   rows: InvestmentRow[];
   note?: string;
   offerValidityDays?: number;
+  showTotals?: boolean;
 }
 
 export interface ProposalMetadata {
@@ -136,6 +137,7 @@ export class Proposal {
         enabled: false,
         title: "Inversion",
         rows: [],
+        showTotals: true,
       },
       closingText: "",
       showSignature: true,

@@ -1,9 +1,25 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { ProposalEditorSectionsTab } from "./ProposalEditorSectionsTab";
 import { ProposalSection } from "../../domain/entities/Proposal";
+import { SectionFormDTO } from "../../application/dtos/schemas";
+
+interface MockSectionFormProps {
+  onSubmit: (data: SectionFormDTO) => Promise<void>;
+  onCancel?: () => void;
+  isEditing?: boolean;
+}
+
+interface MockSectionsListProps {
+  onDelete: (sectionId: string) => Promise<void>;
+  onMoveUp: (sectionId: string) => Promise<void>;
+  onMoveDown: (sectionId: string) => Promise<void>;
+  onToggleVisibility: (sectionId: string) => Promise<void>;
+  onEdit: (section: ProposalSection) => void;
+  sections: ProposalSection[];
+}
 
 vi.mock("./SectionForm", () => ({
-  SectionForm: ({ onSubmit, onCancel, isEditing }: { onSubmit: (data: any) => Promise<void>; onCancel?: () => void; isEditing?: boolean }) => (
+  SectionForm: ({ onSubmit, onCancel, isEditing }: MockSectionFormProps) => (
     <div>
       <p>{isEditing ? "MockSectionFormEdit" : "MockSectionFormCreate"}</p>
       <button type="button" onClick={() => void onSubmit({ title: "S", content: "C", kind: "text" })}>
@@ -15,7 +31,7 @@ vi.mock("./SectionForm", () => ({
 }));
 
 vi.mock("./SectionsList", () => ({
-  SectionsList: ({ onDelete, onMoveUp, onMoveDown, onToggleVisibility, onEdit, sections }: any) => (
+  SectionsList: ({ onDelete, onMoveUp, onMoveDown, onToggleVisibility, onEdit, sections }: MockSectionsListProps) => (
     <div>
       <p>MockSectionsList:{sections.length}</p>
       <button type="button" onClick={() => void onDelete("s1")}>Delete</button>
