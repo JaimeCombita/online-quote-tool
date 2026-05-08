@@ -12,6 +12,7 @@ import {
   getRateLimitedResponse,
   isPayloadWithinLimit,
 } from "@/modules/shared/infrastructure/security/requestGuards";
+import { CorporativeEmailTemplate, ProposalEmailService } from "@/modules/shared/infrastructure/email";
 
 export const runtime = "nodejs";
 
@@ -24,8 +25,14 @@ interface SendProposalEmailPayload {
   to?: string;
   subject?: string;
   message?: string;
+  recipientName?: string;
+  senderName?: string;
   pdfBase64?: string;
 }
+
+// Composición: inyección de dependencias
+const emailTemplateRenderer = new CorporativeEmailTemplate();
+const emailService = new ProposalEmailService(emailTemplateRenderer);
 
 const isValidEmail = (value: string): boolean =>
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -42,23 +49,6 @@ const isValidSender = (value: string): boolean => {
   }
 
   return isValidEmail(match[1].trim());
-};
-
-const buildDefaultMessage = (proposal: Proposal): string => {
-  const snap = proposal.snapshot;
-  const customer = snap.client.name;
-
-  return [
-    `Hola ${customer},`,
-    "",
-    "Adjunto encontrarás la propuesta comercial solicitada.",
-    "",
-    "Quedo atento(a) a tus comentarios.",
-    "",
-    `${snap.issuer.responsibleName}`,
-    `${snap.issuer.role}`,
-    `${snap.issuer.businessName}`,
-  ].join("\n");
 };
 
 export async function POST(request: Request): Promise<Response> {
@@ -80,14 +70,16 @@ export async function POST(request: Request): Promise<Response> {
 
     const payload = (await request.json()) as SendProposalEmailPayload;
 
+    // Validaciones básicas
     if (!payload.proposal) {
       return Response.json({ error: "El payload de la propuesta es requerido" }, { status: 400 });
     }
 
     if (!payload.to || !isValidEmail(payload.to)) {
-      return Response.json({ error: "Debes ingresar un correo destinatario valido" }, { status: 400 });
+      return Response.json({ error: "Debes ingresar un correo destinatario válido" }, { status: 400 });
     }
 
+    // Rehydratación y validación de propuesta
     const proposal = Proposal.rehydrate(payload.proposal);
     const validation = proposal.validateForPdf();
 
@@ -101,11 +93,12 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
 
+    // Validaciones de configuración
     if (!process.env.RESEND_API_KEY) {
       return Response.json(
         {
           error:
-            "RESEND_API_KEY no esta configurada. Configura las variables de entorno antes de enviar correos.",
+            "RESEND_API_KEY no está configurada. Configura las variables de entorno antes de enviar correos.",
         },
         { status: 500 },
       );
@@ -116,32 +109,50 @@ export async function POST(request: Request): Promise<Response> {
       return Response.json(
         {
           error:
-            "RESEND_FROM_EMAIL no esta configurado con un correo remitente valido.",
+            "RESEND_FROM_EMAIL no está configurado con un correo remitente válido.",
         },
         { status: 500 },
       );
     }
 
-    const resend = new Resend(process.env.RESEND_API_KEY);
-    const fileName = `${sanitizeFileName(proposal.snapshot.metadata.title)}.pdf`;
+    // Resolución de URL base para assets (logo) en el cuerpo del email
+    const requestOrigin = (() => {
+      try {
+        return new URL(request.url).origin;
+      } catch {
+        return process.env.NEXT_PUBLIC_BASE_URL ?? "";
+      }
+    })();
+
+    const snap = proposal.snapshot;
+
+    // Generación del email usando el servicio
+    const emailResult = emailService.generateProposalEmail({
+      proposal,
+      recipientEmail: payload.to,
+      recipientName: snap.client.contactName?.trim() || snap.client.name,
+      senderName: undefined,
+      customMessage: payload.message?.trim(),
+      overrideSubject: payload.subject?.trim(),
+      appBaseUrl: requestOrigin,
+    });
+
+    // Generación del PDF
     const attachmentBase64 = payload.pdfBase64?.trim()
       ? payload.pdfBase64.trim()
       : Buffer.from(await generateProposalPdf(proposal)).toString("base64");
 
-    const subject =
-      payload.subject?.trim() ||
-      `Propuesta comercial - ${proposal.snapshot.metadata.title}`;
-
-    const messageBody = payload.message?.trim() || buildDefaultMessage(proposal);
-
+    // Envío del email
+    const resend = new Resend(process.env.RESEND_API_KEY);
     const resendResult = await resend.emails.send({
       from: fromEmail,
       to: [payload.to],
-      subject,
-      text: messageBody,
+      subject: emailResult.subject,
+      html: emailResult.template.htmlBody,
+      text: emailResult.template.textBody,
       attachments: [
         {
-          filename: fileName,
+          filename: emailResult.fileName,
           content: attachmentBase64,
         },
       ],

@@ -4,7 +4,6 @@ import { Proposal } from "../../../domain/entities/Proposal";
 import { downloadBlobFile, downloadTextFile } from "../../../application/services/fileDownload";
 import {
   createProposalPreviewPdfBlob,
-  proposalPdfBlobToBase64,
 } from "../../../application/services/proposalPreviewPdfService";
 import { sendProposalEmailRequest } from "../../../application/services/proposalApiClient";
 
@@ -108,15 +107,11 @@ export const useEditorDocumentActions = ({
     setIsSendingEmail(true);
 
     try {
-      const previewPdfBlob = await createProposalPreviewPdfBlob(previewPagesContainerRef.current);
-      const pdfBase64 = await proposalPdfBlobToBase64(previewPdfBlob);
-
       await sendProposalEmailRequest({
         proposal: proposal.snapshot,
         to: recipientEmail.trim(),
         subject: emailSubject,
         message: emailMessage,
-        pdfBase64,
       });
 
       setError(null);

@@ -5,7 +5,7 @@ interface SendProposalEmailPayload {
   to: string;
   subject: string;
   message: string;
-  pdfBase64: string;
+  pdfBase64?: string;
 }
 
 interface PrepareWhatsAppPayload {
