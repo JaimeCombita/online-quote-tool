@@ -18,10 +18,12 @@ export class CorporativeEmailTemplate implements EmailTemplateRenderer {
     const client = snap.client;
     const metadata = snap.metadata;
 
-    const appBaseUrl = context.appBaseUrl ?? "";
-    const logoAbsoluteUrl = appBaseUrl
-      ? `${appBaseUrl}${jcBrandConfig.assets.logoMain}`
-      : jcBrandConfig.assets.logoMain;
+    const appBaseUrl = (context.appBaseUrl ?? "").trim().replace(/\/+$/, "");
+    const defaultWebsite = jcBrandConfig.links.website.replace(/\/+$/, "");
+    const logoPath = jcBrandConfig.assets.logoMain.startsWith("/")
+      ? jcBrandConfig.assets.logoMain
+      : `/${jcBrandConfig.assets.logoMain}`;
+    const logoAbsoluteUrl = `${appBaseUrl || defaultWebsite}${logoPath}`;
 
     // Número de WhatsApp: solo dígitos, listo para wa.me
     const whatsappPhone = issuer.phone?.replace(/\D/g, "") ?? "";
@@ -384,11 +386,6 @@ export class CorporativeEmailTemplate implements EmailTemplateRenderer {
         </div>` : ""}
       </div>
       
-      <!-- CTA Section -->
-      <div class="cta-section">
-        <p>¿Preguntas sobre la propuesta?</p>
-        <a href="mailto:${issuerEmail}" class="cta-button">Responder</a>
-      </div>
     </div>
     
     <!-- Footer -->

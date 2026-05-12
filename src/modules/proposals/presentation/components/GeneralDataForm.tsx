@@ -2,11 +2,11 @@
 
 import { GeneralFormDTO } from "../../application/dtos/schemas";
 import { useGeneralDataForm } from "../hooks/forms/useGeneralDataForm";
+import { PROPOSAL_TITLE_MAX_LENGTH } from "../../domain/constants/proposalConstraints";
 
 interface GeneralDataFormProps {
   initialData: {
     title: string;
-    subtitle: string;
     clientName: string;
     clientCompany: string;
     clientContact: string;
@@ -17,10 +17,18 @@ interface GeneralDataFormProps {
     currency: "COP" | "USD";
   };
   onSubmit: (data: GeneralFormDTO) => Promise<void>;
+  isOfferExpired: boolean;
+  onRenewProposal: () => Promise<void>;
   isLoading?: boolean;
 }
 
-export function GeneralDataForm({ initialData, onSubmit, isLoading = false }: GeneralDataFormProps) {
+export function GeneralDataForm({
+  initialData,
+  onSubmit,
+  isOfferExpired,
+  onRenewProposal,
+  isLoading = false,
+}: GeneralDataFormProps) {
   const {
     formData,
     errors,
@@ -46,24 +54,14 @@ export function GeneralDataForm({ initialData, onSubmit, isLoading = false }: Ge
             name="title"
             value={formData.title}
             onChange={handleChange}
+            maxLength={PROPOSAL_TITLE_MAX_LENGTH}
             className={`mt-1 block w-full rounded border px-3 py-2 text-sm ${
               errors.title ? "border-red-500 bg-red-50" : "border-slate-300 bg-white"
             }`}
             disabled={isSubmitting || isLoading}
           />
+          <p className="mt-1 text-xs text-slate-500">Máximo {PROPOSAL_TITLE_MAX_LENGTH} caracteres.</p>
           {errors.title && <p className="mt-1 text-xs text-red-600">{errors.title}</p>}
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-700">Subtitulo</label>
-          <input
-            type="text"
-            name="subtitle"
-            value={formData.subtitle}
-            onChange={handleChange}
-            className="mt-1 block w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm"
-            disabled={isSubmitting || isLoading}
-          />
         </div>
 
         <div>
@@ -149,8 +147,21 @@ export function GeneralDataForm({ initialData, onSubmit, isLoading = false }: Ge
             value={formData.issueDate.split("T")[0]}
             onChange={(e) => handleIssueDateChange(e.target.value)}
             className="mt-1 block w-full rounded border border-slate-300 bg-white px-3 py-2 text-sm"
-            disabled={isSubmitting || isLoading}
+            disabled
           />
+          <p className="mt-1 text-xs text-slate-500">La fecha de emision se actualiza automaticamente al renovar una propuesta vencida.</p>
+          {isOfferExpired && (
+            <button
+              type="button"
+              onClick={() => {
+                void onRenewProposal();
+              }}
+              disabled={isSubmitting || isLoading}
+              className="mt-2 inline-flex items-center rounded-lg border border-amber-300 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 transition hover:bg-amber-100 disabled:opacity-50"
+            >
+              Renovar propuesta
+            </button>
+          )}
         </div>
 
         <div>

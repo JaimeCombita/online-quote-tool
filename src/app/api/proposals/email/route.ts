@@ -12,13 +12,22 @@ import {
   getRateLimitedResponse,
   isPayloadWithinLimit,
 } from "@/modules/shared/infrastructure/security/requestGuards";
+import {
+  telemetryDuration,
+  telemetryNow,
+  trackTelemetry,
+} from "@/modules/shared/infrastructure/observability/telemetry";
 import { CorporativeEmailTemplate, ProposalEmailService } from "@/modules/shared/infrastructure/email";
 
 export const runtime = "nodejs";
 
 const EMAIL_RATE_LIMIT_MAX_REQUESTS = Number(process.env.RATE_LIMIT_EMAIL_MAX_REQUESTS ?? "6");
 const EMAIL_RATE_LIMIT_WINDOW_MS = Number(process.env.RATE_LIMIT_EMAIL_WINDOW_MS ?? String(10 * 60 * 1000));
-const EMAIL_PAYLOAD_MAX_BYTES = Number(process.env.EMAIL_PAYLOAD_MAX_BYTES ?? String(1_000_000));
+const EMAIL_PAYLOAD_MIN_BYTES = 8_000_000;
+const EMAIL_PAYLOAD_MAX_BYTES = Math.max(
+  Number(process.env.EMAIL_PAYLOAD_MAX_BYTES ?? String(EMAIL_PAYLOAD_MIN_BYTES)),
+  EMAIL_PAYLOAD_MIN_BYTES,
+);
 
 interface SendProposalEmailPayload {
   proposal?: ProposalProps;
@@ -51,7 +60,14 @@ const isValidSender = (value: string): boolean => {
   return isValidEmail(match[1].trim());
 };
 
+const normalizeBaseUrl = (value: string): string => value.replace(/\/+$/, "");
+
+const isLocalhostUrl = (value: string): boolean => /https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(value);
+
 export async function POST(request: Request): Promise<Response> {
+  const startedAt = telemetryNow();
+  let proposalContext: { proposalId?: string; version?: number } = {};
+
   try {
     cleanupRateLimitBuckets();
 
@@ -61,10 +77,26 @@ export async function POST(request: Request): Promise<Response> {
     });
 
     if (!limitDecision.allowed) {
+      trackTelemetry({
+        scope: "api.proposals.email",
+        action: "send-email",
+        outcome: "rejected",
+        statusCode: 429,
+        durationMs: telemetryDuration(startedAt),
+        detail: "rate-limited",
+      });
       return getRateLimitedResponse(limitDecision);
     }
 
     if (!isPayloadWithinLimit(request, EMAIL_PAYLOAD_MAX_BYTES)) {
+      trackTelemetry({
+        scope: "api.proposals.email",
+        action: "send-email",
+        outcome: "rejected",
+        statusCode: 413,
+        durationMs: telemetryDuration(startedAt),
+        detail: "payload-too-large",
+      });
       return getPayloadTooLargeResponse();
     }
 
@@ -72,18 +104,48 @@ export async function POST(request: Request): Promise<Response> {
 
     // Validaciones básicas
     if (!payload.proposal) {
+      trackTelemetry({
+        scope: "api.proposals.email",
+        action: "send-email",
+        outcome: "rejected",
+        statusCode: 400,
+        durationMs: telemetryDuration(startedAt),
+        detail: "missing-proposal-payload",
+      });
       return Response.json({ error: "El payload de la propuesta es requerido" }, { status: 400 });
     }
 
     if (!payload.to || !isValidEmail(payload.to)) {
+      trackTelemetry({
+        scope: "api.proposals.email",
+        action: "send-email",
+        outcome: "rejected",
+        statusCode: 400,
+        durationMs: telemetryDuration(startedAt),
+        detail: "invalid-recipient-email",
+      });
       return Response.json({ error: "Debes ingresar un correo destinatario válido" }, { status: 400 });
     }
 
     // Rehydratación y validación de propuesta
     const proposal = Proposal.rehydrate(payload.proposal);
+    proposalContext = {
+      proposalId: proposal.snapshot.id,
+      version: proposal.snapshot.metadata.version ?? 1,
+    };
     const validation = proposal.validateForPdf();
 
     if (!validation.isValid) {
+      trackTelemetry({
+        scope: "api.proposals.email",
+        action: "send-email",
+        outcome: "rejected",
+        proposalId: proposalContext.proposalId,
+        version: proposalContext.version,
+        statusCode: 400,
+        durationMs: telemetryDuration(startedAt),
+        detail: "proposal-validation-failed",
+      });
       return Response.json(
         {
           error: "La propuesta no cumple los requisitos para generar/enviar PDF",
@@ -95,6 +157,16 @@ export async function POST(request: Request): Promise<Response> {
 
     // Validaciones de configuración
     if (!process.env.RESEND_API_KEY) {
+      trackTelemetry({
+        scope: "api.proposals.email",
+        action: "send-email",
+        outcome: "error",
+        proposalId: proposalContext.proposalId,
+        version: proposalContext.version,
+        statusCode: 500,
+        durationMs: telemetryDuration(startedAt),
+        detail: "missing-resend-api-key",
+      });
       return Response.json(
         {
           error:
@@ -106,6 +178,16 @@ export async function POST(request: Request): Promise<Response> {
 
     const fromEmail = process.env.RESEND_FROM_EMAIL?.trim();
     if (!fromEmail || !isValidSender(fromEmail)) {
+      trackTelemetry({
+        scope: "api.proposals.email",
+        action: "send-email",
+        outcome: "error",
+        proposalId: proposalContext.proposalId,
+        version: proposalContext.version,
+        statusCode: 500,
+        durationMs: telemetryDuration(startedAt),
+        detail: "invalid-from-email",
+      });
       return Response.json(
         {
           error:
@@ -120,9 +202,18 @@ export async function POST(request: Request): Promise<Response> {
       try {
         return new URL(request.url).origin;
       } catch {
-        return process.env.NEXT_PUBLIC_BASE_URL ?? "";
+        return "";
       }
     })();
+
+    const configuredBaseUrl =
+      process.env.NEXT_PUBLIC_BASE_URL?.trim() ||
+      process.env.PUBLIC_APP_BASE_URL?.trim() ||
+      jcBrandConfig.links.website;
+
+    const appBaseUrl = !isLocalhostUrl(requestOrigin)
+      ? normalizeBaseUrl(requestOrigin)
+      : normalizeBaseUrl(configuredBaseUrl);
 
     const snap = proposal.snapshot;
 
@@ -134,7 +225,7 @@ export async function POST(request: Request): Promise<Response> {
       senderName: undefined,
       customMessage: payload.message?.trim(),
       overrideSubject: payload.subject?.trim(),
-      appBaseUrl: requestOrigin,
+      appBaseUrl,
     });
 
     // Generación del PDF
@@ -160,6 +251,16 @@ export async function POST(request: Request): Promise<Response> {
     });
 
     if (resendResult.error) {
+      trackTelemetry({
+        scope: "api.proposals.email",
+        action: "send-email",
+        outcome: "error",
+        proposalId: proposalContext.proposalId,
+        version: proposalContext.version,
+        statusCode: 502,
+        durationMs: telemetryDuration(startedAt),
+        detail: `resend-error:${resendResult.error.message}`,
+      });
       return Response.json(
         {
           error: `Resend error: ${resendResult.error.message}`,
@@ -168,9 +269,32 @@ export async function POST(request: Request): Promise<Response> {
       );
     }
 
+    trackTelemetry({
+      scope: "api.proposals.email",
+      action: "send-email",
+      outcome: "success",
+      proposalId: proposalContext.proposalId,
+      version: proposalContext.version,
+      statusCode: 200,
+      durationMs: telemetryDuration(startedAt),
+      metadata: {
+        usedClientPdfPayload: Boolean(payload.pdfBase64?.trim()),
+      },
+    });
+
     return Response.json({ ok: true, id: resendResult.data?.id ?? null }, { status: 200 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "No fue posible enviar el correo en este momento";
+    trackTelemetry({
+      scope: "api.proposals.email",
+      action: "send-email",
+      outcome: "error",
+      proposalId: proposalContext.proposalId,
+      version: proposalContext.version,
+      statusCode: 500,
+      durationMs: telemetryDuration(startedAt),
+      detail: message,
+    });
     return Response.json(
       { error: message },
       { status: 500 },

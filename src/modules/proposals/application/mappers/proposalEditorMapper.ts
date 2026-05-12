@@ -2,7 +2,6 @@ import { Proposal } from "../../domain/entities/Proposal";
 
 export interface GeneralDataFormInitialData {
   title: string;
-  subtitle: string;
   clientName: string;
   clientCompany: string;
   clientContact: string;
@@ -21,7 +20,6 @@ export interface ProposalEmailDefaults {
 
 export const mapGeneralDataFormInitialData = (proposal: Proposal): GeneralDataFormInitialData => ({
   title: proposal.snapshot.metadata.title,
-  subtitle: proposal.snapshot.metadata.subtitle || "",
   clientName: proposal.snapshot.client.name,
   clientCompany: proposal.snapshot.client.company || "",
   clientContact: proposal.snapshot.client.contactName || "",

@@ -37,8 +37,7 @@ export const useEditorProposalActions = ({
           proposalId: proposal.snapshot.id,
           metadata: {
             title: data.title,
-            subtitle: data.subtitle,
-            issueDate: data.issueDate,
+            issueDate: proposal.snapshot.metadata.issueDate,
             city: data.city,
             currency: data.currency,
           },
@@ -58,6 +57,31 @@ export const useEditorProposalActions = ({
     },
     [proposal, proposalModule, setError, setProposal],
   );
+
+  const handleRenewProposal = useCallback(async () => {
+    if (!proposal) {
+      return;
+    }
+
+    if (!proposal.isOfferExpired(new Date())) {
+      setError("La propuesta aun no esta vencida.");
+      return;
+    }
+
+    try {
+      const renewedIssueDate = new Date().toISOString();
+      const updated = await proposalModule.updateProposalDraft.execute({
+        proposalId: proposal.snapshot.id,
+        metadata: {
+          issueDate: renewedIssueDate,
+        },
+      });
+      setProposal(updated);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to renew proposal");
+    }
+  }, [proposal, proposalModule, setError, setProposal]);
 
   const handleAddSection = useCallback(
     async (data: SectionFormDTO) => {
@@ -219,6 +243,7 @@ export const useEditorProposalActions = ({
 
   return {
     handleGeneralDataSubmit,
+    handleRenewProposal,
     handleAddSection,
     handleUpdateSection,
     handleDeleteSection,

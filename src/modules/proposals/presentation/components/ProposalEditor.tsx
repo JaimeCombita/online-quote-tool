@@ -50,8 +50,10 @@ export function ProposalEditor({ proposalId }: ProposalEditorProps) {
     companySettings,
     previewPagesContainerRef,
     generalDataInitialValues,
+    isProposalExpired,
     pdfValidation,
     handleGeneralDataSubmit,
+    handleRenewProposal,
     handleIssuerSubmit,
     handleAddSection,
     handleUpdateSection,
@@ -98,6 +100,8 @@ export function ProposalEditor({ proposalId }: ProposalEditorProps) {
   }
 
   const snap = proposal.snapshot;
+  const proposalVersion = snap.metadata.version ?? 1;
+  const hasUnpublishedChanges = snap.publicationState?.hasUnpublishedChanges ?? false;
   const editorTabs: EditorTab[] = ["general", "sections", "investment", "closing", "preview"];
 
   return (
@@ -119,9 +123,6 @@ export function ProposalEditor({ proposalId }: ProposalEditorProps) {
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">{snap.metadata.title}</h1>
-            {snap.metadata.subtitle && (
-              <p className="mt-1 text-slate-600">{snap.metadata.subtitle}</p>
-            )}
             <div className="mt-4 flex flex-wrap gap-2">
               <button
                 type="button"
@@ -143,6 +144,10 @@ export function ProposalEditor({ proposalId }: ProposalEditorProps) {
           <div className="text-right text-xs text-slate-500">
             <p>ID: {snap.id}</p>
             <p>Actualizado: {new Date(snap.updatedAt).toLocaleString()}</p>
+            <p>Version: v{proposalVersion}</p>
+            <p className={hasUnpublishedChanges ? "text-amber-600" : "text-emerald-600"}>
+              {hasUnpublishedChanges ? "Cambios pendientes de publicar" : "Publicada"}
+            </p>
             <p className="mt-2">
               Estado: 
               <span
@@ -200,8 +205,11 @@ export function ProposalEditor({ proposalId }: ProposalEditorProps) {
         {activeTab === "general" && (
           generalDataInitialValues && (
             <GeneralDataForm
+              key={snap.updatedAt}
               initialData={generalDataInitialValues}
               onSubmit={handleGeneralDataSubmit}
+              isOfferExpired={isProposalExpired}
+              onRenewProposal={handleRenewProposal}
               isLoading={isLoading}
             />
           )

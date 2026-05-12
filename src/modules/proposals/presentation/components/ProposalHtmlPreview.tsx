@@ -1,5 +1,6 @@
 import { Proposal } from "../../domain/entities/Proposal";
 import { jcBrandConfig } from "@/modules/shared/branding/brand.config";
+import { PROPOSAL_TITLE_MAX_LENGTH } from "../../domain/constants/proposalConstraints";
 import { loadCompanySettings } from "../../infrastructure/browser/companySettings";
 import signatureFontStyles from "../styles/SignatureFonts.module.css";
 import styles from "./ProposalHtmlPreview.module.css";
@@ -41,6 +42,55 @@ const parseTextLineStyle = (line: string): { text: string; isSubtitle: boolean }
   };
 };
 
+type TextContentGroup = {
+  heading: string | null;
+  lines: string[];
+};
+
+const buildTextContentGroups = (lines: string[]): TextContentGroup[] => {
+  const groups: TextContentGroup[] = [];
+  let currentGroup: TextContentGroup | null = null;
+
+  const flushGroup = () => {
+    if (currentGroup && (currentGroup.heading || currentGroup.lines.length > 0)) {
+      groups.push(currentGroup);
+    }
+    currentGroup = null;
+  };
+
+  for (const line of lines) {
+    const parsedLine = parseTextLineStyle(line);
+
+    if (parsedLine.isSubtitle) {
+      flushGroup();
+      currentGroup = { heading: parsedLine.text, lines: [] };
+      continue;
+    }
+
+    if (!currentGroup) {
+      currentGroup = { heading: null, lines: [] };
+    }
+
+    currentGroup.lines.push(parsedLine.text);
+  }
+
+  flushGroup();
+  return groups;
+};
+
+const isBulletLine = (line: string): boolean => /^[•*-]\s+/.test(line);
+
+const normalizeBulletLine = (line: string): string => line.replace(/^[•*-]\s+/, "");
+
+const truncateText = (value: string, maxLength: number): string => {
+  const trimmed = value.trim();
+  if (trimmed.length <= maxLength) {
+    return trimmed;
+  }
+
+  return `${trimmed.slice(0, Math.max(maxLength - 1, 0)).trimEnd()}…`;
+};
+
 const toExternalUrl = (value: string): string => {
   if (/^https?:\/\//i.test(value)) {
     return value;
@@ -51,11 +101,11 @@ const toExternalUrl = (value: string): string => {
 const PAGE_CONTENT_HEIGHT = 680;
 
 const MAX_LINES_PER_BLOCK_BY_KIND = {
-  text: 14,
-  bullets: 16,
-  highlight: 12,
-  investment: 14,
-  table: 12,
+  text: 8,
+  bullets: 6,
+  highlight: 5,
+  investment: 7,
+  table: 6,
 } as const;
 
 const chunkArray = <T,>(items: T[], chunkSize: number): T[][] => {
@@ -68,6 +118,30 @@ const chunkArray = <T,>(items: T[], chunkSize: number): T[][] => {
     chunks.push(items.slice(index, index + chunkSize));
   }
   return chunks;
+};
+
+const chunkGroupsByLineCount = (groups: TextContentGroup[], maxLines: number): TextContentGroup[][] => {
+  if (groups.length === 0) return [[]];
+  const chunks: TextContentGroup[][] = [];
+  let currentChunk: TextContentGroup[] = [];
+  let currentLineCount = 0;
+
+  for (const group of groups) {
+    const groupLineCount = (group.heading ? 1 : 0) + group.lines.length;
+    if (currentLineCount + groupLineCount > maxLines && currentChunk.length > 0) {
+      chunks.push(currentChunk);
+      currentChunk = [];
+      currentLineCount = 0;
+    }
+    currentChunk.push(group);
+    currentLineCount += groupLineCount;
+  }
+
+  if (currentChunk.length > 0) {
+    chunks.push(currentChunk);
+  }
+
+  return chunks.length > 0 ? chunks : [[]];
 };
 
 type PreviewBlock = {
@@ -88,6 +162,7 @@ export function ProposalHtmlPreview({ proposal, pagesContainerRef }: ProposalHtm
   const companySettingsLogoUrl = typeof window === "undefined" ? "" : loadCompanySettings()?.logoUrl ?? "";
   const issuerLogoUrl = snapshot.issuer.logoUrl || companySettingsLogoUrl || jcBrandConfig.assets.logoMain;
   const visibleSections = snapshot.sections.filter((section) => section.isVisible);
+  const proposalVersion = snapshot.metadata.version ?? 1;
   const formatter = currencyFormatters[snapshot.metadata.currency];
   const investmentSubtotal = snapshot.investment.rows.reduce(
     (sum, row) => sum + row.quantity * row.unitPrice,
@@ -103,16 +178,20 @@ export function ProposalHtmlPreview({ proposal, pagesContainerRef }: ProposalHtm
 
   const sectionBlocks: PreviewBlock[] = visibleSections.flatMap((section, index) => {
     const lines = splitLines(section.content);
+    const textGroups = section.kind === "text" ? buildTextContentGroups(lines) : [];
     const parsedRows = lines
       .map((line) => line.split("|").map((cell) => cell.trim()))
       .filter((row) => row.length > 0);
     const tableHeader = parsedRows[0] ?? [];
     const tableBody = parsedRows.slice(1);
 
-    const lineChunks = chunkArray(
-      lines.length > 0 ? lines : [section.content],
-      MAX_LINES_PER_BLOCK_BY_KIND[section.kind],
-    );
+    const lineChunks: (string | TextContentGroup)[][] =
+      section.kind === "text"
+        ? chunkGroupsByLineCount(textGroups, MAX_LINES_PER_BLOCK_BY_KIND.text)
+        : chunkArray<string>(
+            lines.length > 0 ? lines : [section.content],
+            MAX_LINES_PER_BLOCK_BY_KIND[section.kind],
+          );
     const tableBodyChunks = section.kind === "table"
       ? chunkArray(tableBody, MAX_LINES_PER_BLOCK_BY_KIND.table)
       : [];
@@ -123,38 +202,44 @@ export function ProposalHtmlPreview({ proposal, pagesContainerRef }: ProposalHtm
       const contentLines = section.kind === "table" ? [] : lineChunks[chunkIndex] ?? [];
       const contentRows = section.kind === "table" ? tableBodyChunks[chunkIndex] ?? [] : [];
       const isContinuation = chunkIndex > 0;
+      // h-10 circle (40px) + space-y-3 gap (12px) below it
+      const sectionHeaderHeight = isContinuation ? 0 : 52;
 
-      let estimatedHeight = 58;
+      let estimatedHeight = 48;
+      estimatedHeight += sectionHeaderHeight;
       if (section.kind === "table") {
         estimatedHeight += 26 + contentRows.length * 24;
       } else if (section.kind === "highlight") {
-        estimatedHeight += 22 + contentLines.length * 28;
+        estimatedHeight += 20 + contentLines.length * 30;
       } else if (section.kind === "bullets") {
-        estimatedHeight += contentLines.length * 24;
-      } else {
         estimatedHeight += contentLines.length * 28;
+      } else if (section.kind === "text") {
+        const groups = contentLines as TextContentGroup[];
+        const lineCount = groups.reduce((sum, g) => sum + (g.heading ? 1 : 0) + g.lines.length, 0);
+        estimatedHeight += lineCount * 22 + Math.max(0, groups.length - 1) * 12;
+      } else {
+        estimatedHeight += contentLines.length * 30;
       }
 
       return {
         id: `${section.id}-${chunkIndex + 1}`,
         estimatedHeight,
         content: (
-          <article className="space-y-3 px-5 py-6 sm:px-8">
-            <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-900 text-sm font-semibold text-white">
-                {index + 1}
+          <article className="space-y-3 px-[38px] py-6">
+            {!isContinuation && (
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-900 text-sm font-semibold text-white">
+                  {index + 1}
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold text-slate-900">{section.title}</h3>
+                </div>
               </div>
-              <div>
-                <h3 className="text-xl font-semibold text-slate-900">
-                  {section.title}
-                  {isContinuation && <span className="ml-2 text-sm text-slate-500">(continua)</span>}
-                </h3>
-              </div>
-            </div>
+            )}
 
             {section.kind === "bullets" && (
-              <ul className="space-y-1 pl-10 text-sm leading-6 text-slate-700">
-                {contentLines.map((line, lineIndex) => (
+              <ul className="space-y-1 pl-6 text-sm leading-6 text-slate-700">
+                {(contentLines as string[]).map((line, lineIndex) => (
                   <li key={`${section.id}-${chunkIndex}-${lineIndex}`} className="list-disc">
                     {line.replace(/^[-*•]\s*/, "")}
                   </li>
@@ -163,13 +248,17 @@ export function ProposalHtmlPreview({ proposal, pagesContainerRef }: ProposalHtm
             )}
 
             {section.kind === "highlight" && (
-              <div className="ml-10 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm leading-6 text-slate-700">
-                {contentLines.map((line, lineIndex) => <p key={`${section.id}-${chunkIndex}-${lineIndex}`}>{line}</p>)}
+              <div className="ml-6 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm leading-6 text-slate-700">
+                {(contentLines as string[]).map((line, lineIndex) => (
+                  <p key={`${section.id}-${chunkIndex}-${lineIndex}`} className="m-0">
+                    {line}
+                  </p>
+                ))}
               </div>
             )}
 
             {section.kind === "table" && (
-              <div className="ml-10 overflow-hidden rounded-2xl border border-slate-200">
+              <div className="ml-6 overflow-hidden rounded-2xl border border-slate-200">
                 <table className="min-w-full border-collapse text-left text-sm text-slate-700">
                   {tableHeader.length > 0 && (
                     <thead>
@@ -204,24 +293,35 @@ export function ProposalHtmlPreview({ proposal, pagesContainerRef }: ProposalHtm
             )}
 
             {section.kind === "text" && (
-              <div className="ml-10 space-y-2 text-sm leading-6 text-slate-700">
-                {contentLines.map((line, lineIndex) => {
-                  const parsedLine = parseTextLineStyle(line);
-                  return (
-                    <p
-                      key={`${section.id}-${chunkIndex}-${lineIndex}`}
-                      className={parsedLine.isSubtitle ? "font-semibold text-sky-700" : undefined}
-                    >
-                      {parsedLine.text}
-                    </p>
-                  );
-                })}
+              <div className="ml-4 space-y-3 text-sm leading-5 text-slate-700">
+                {(contentLines as TextContentGroup[]).map((group, groupIndex) => (
+                  <div key={`${section.id}-${chunkIndex}-${groupIndex}`} className="space-y-1">
+                    {group.heading && <p className="m-0 font-semibold text-sky-700">{group.heading}</p>}
+                    {group.lines.map((line, lineIndex) => {
+                      const bulletLine = isBulletLine(line);
+                      const textValue = bulletLine ? normalizeBulletLine(line) : line;
+
+                      return (
+                        <p
+                          key={`${section.id}-${chunkIndex}-${groupIndex}-${lineIndex}`}
+                          className={`m-0 ${bulletLine ? "pl-3" : ""}`}
+                        >
+                          {bulletLine ? `• ${textValue}` : textValue}
+                        </p>
+                      );
+                    })}
+                  </div>
+                ))}
               </div>
             )}
 
             {section.kind === "investment" && (
-              <div className="ml-10 space-y-2 text-sm leading-6 text-slate-700">
-                {contentLines.map((line, lineIndex) => <p key={`${section.id}-${chunkIndex}-${lineIndex}`}>{line}</p>)}
+              <div className="ml-6 space-y-2 text-sm leading-6 text-slate-700">
+                {(contentLines as string[]).map((line, lineIndex) => (
+                  <p key={`${section.id}-${chunkIndex}-${lineIndex}`} className="m-0">
+                    {line}
+                  </p>
+                ))}
               </div>
             )}
           </article>
@@ -233,11 +333,11 @@ export function ProposalHtmlPreview({ proposal, pagesContainerRef }: ProposalHtm
   const baseBlocks: PreviewBlock[] = [
     {
       id: "cover",
-      estimatedHeight: 320,
+      estimatedHeight: 220,
       content: (
         <>
           <div className="grid gap-0 border-b border-slate-200 sm:grid-cols-2">
-            <div className="border-b border-slate-200 px-5 py-5 sm:border-b-0 sm:border-r sm:px-8">
+            <div className="border-b border-slate-200 px-[38px] py-5 sm:border-b-0 sm:border-r">
               <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Cliente</p>
               <h3 className="mt-3 text-xl font-semibold text-slate-900">{snapshot.client.name}</h3>
               <div className="mt-3 space-y-1 text-sm text-slate-600">
@@ -247,7 +347,7 @@ export function ProposalHtmlPreview({ proposal, pagesContainerRef }: ProposalHtm
               </div>
             </div>
 
-            <div className="px-5 py-5 sm:px-8">
+            <div className="px-[38px] py-5">
               <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Emisor</p>
               <h3 className="mt-3 text-xl font-semibold text-slate-900">
                 {snapshot.issuer.businessName}
@@ -296,7 +396,7 @@ export function ProposalHtmlPreview({ proposal, pagesContainerRef }: ProposalHtm
         id: `investment-${chunkIndex + 1}`,
         estimatedHeight,
         content: (
-          <section className="space-y-3 px-5 py-6 sm:px-8">
+          <section className="space-y-3 px-[38px] py-6">
             {isFirstChunk && (
               <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                 <div>
@@ -310,12 +410,7 @@ export function ProposalHtmlPreview({ proposal, pagesContainerRef }: ProposalHtm
               </div>
             )}
 
-            {!isFirstChunk && (
-              <h3 className="text-xl font-semibold text-slate-900">
-                {snapshot.investment.title}
-                <span className="ml-2 text-sm text-slate-500">(continua)</span>
-              </h3>
-            )}
+            {!isFirstChunk && <div className="h-1" />}
 
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
               <table className="min-w-full border-collapse text-left text-sm text-slate-700">
@@ -383,7 +478,9 @@ export function ProposalHtmlPreview({ proposal, pagesContainerRef }: ProposalHtm
             {isLastChunk && snapshot.investment.note && (
               <div className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs leading-5 text-slate-700">
                 {investmentNoteLines.map((line, lineIndex) => (
-                  <p key={`investment-note-${lineIndex}`}>{line}</p>
+                  <p key={`investment-note-${lineIndex}`} className="m-0">
+                    {line}
+                  </p>
                 ))}
               </div>
             )}
@@ -399,11 +496,13 @@ export function ProposalHtmlPreview({ proposal, pagesContainerRef }: ProposalHtm
       id: "closing",
       estimatedHeight: 90 + closingLines.length * 29,
       content: (
-        <section className="space-y-3 px-5 py-6 sm:px-8">
+        <section className="space-y-3 px-[38px] py-6">
           <h3 className="text-lg font-semibold text-slate-900">Cierre</h3>
           <div className="space-y-2 text-sm leading-6 text-slate-700">
             {closingLines.map((line) => (
-              <p key={`closing-${line}`}>{line}</p>
+              <p key={`closing-${line}`} className="m-0">
+                {line}
+              </p>
             ))}
           </div>
         </section>
@@ -414,12 +513,12 @@ export function ProposalHtmlPreview({ proposal, pagesContainerRef }: ProposalHtm
   const signatureBlock: PreviewBlock | undefined = snapshot.showSignature
     ? {
         id: "signature",
-        estimatedHeight: 210,
+          estimatedHeight: 260,
         content: (
-          <div className="px-5 pt-6 pb-3 text-center sm:px-8">
+            <div className="px-[38px] pt-6 pb-6 text-center">
             <div className="inline-block">
               <p
-                className={`text-3xl text-slate-900 ${
+                className={`m-0 text-3xl text-slate-900 ${
                   signatureFontStyles[signatureFontClassByValue[snapshot.issuer.signatureFont]]
                 }`}
               >
@@ -428,9 +527,9 @@ export function ProposalHtmlPreview({ proposal, pagesContainerRef }: ProposalHtm
               <div className={`mt-2 h-px bg-slate-400 ${styles.signatureDivider}`} />
             </div>
             <p className="mt-2 text-sm font-medium text-slate-900">{snapshot.issuer.responsibleName}</p>
-            <p className="text-sm text-slate-500">{snapshot.issuer.role}</p>
-            {snapshot.issuer.phone && <p className="text-sm text-slate-500">{snapshot.issuer.phone}</p>}
-            <p className="text-sm text-slate-500">{snapshot.issuer.email}</p>
+            <p className="m-0 text-sm text-slate-500">{snapshot.issuer.role}</p>
+            {snapshot.issuer.phone && <p className="m-0 text-sm text-slate-500">{snapshot.issuer.phone}</p>}
+            <p className="m-0 text-sm text-slate-500">{snapshot.issuer.email}</p>
           </div>
         ),
       }
@@ -499,7 +598,7 @@ export function ProposalHtmlPreview({ proposal, pagesContainerRef }: ProposalHtm
             className={`mx-auto w-full max-w-[595px] overflow-hidden border border-slate-200 bg-white shadow-[0_20px_70px_rgba(15,23,42,0.08)] ${styles.previewPage}`}
           >
             <div
-              className={`border-b border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(14,116,144,0.18),_transparent_38%),linear-gradient(135deg,#0f172a,#1e293b)] px-5 py-5 text-white ${styles.previewHeader}`}
+              className={`border-b border-slate-200 bg-[radial-gradient(circle_at_top_left,_rgba(14,116,144,0.18),_transparent_38%),linear-gradient(135deg,#0f172a,#1e293b)] px-[38px] py-5 text-white ${styles.previewHeader}`}
             >
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>
@@ -512,17 +611,21 @@ export function ProposalHtmlPreview({ proposal, pagesContainerRef }: ProposalHtm
                     />
                     <p className="text-xs uppercase tracking-[0.35em] text-sky-200">{page.title}</p>
                   </div>
-                  <h2 className="mt-2 text-2xl font-semibold leading-tight sm:text-3xl">
-                    {snapshot.metadata.title}
+                  <h2
+                    className="mt-2 max-w-[390px] text-[19px] font-semibold leading-tight sm:max-w-[420px] sm:text-[21px]"
+                    style={{
+                      display: "-webkit-box",
+                      WebkitBoxOrient: "vertical",
+                      WebkitLineClamp: 2,
+                      overflow: "hidden",
+                    }}
+                  >
+                    {truncateText(snapshot.metadata.title, PROPOSAL_TITLE_MAX_LENGTH)}
                   </h2>
-                  {snapshot.metadata.subtitle && (
-                    <p className="mt-2 max-w-2xl text-sm text-slate-200">
-                      {snapshot.metadata.subtitle}
-                    </p>
-                  )}
                 </div>
 
                 <div className="grid gap-1 text-xs text-slate-200 sm:text-right">
+                  <p>Version v{proposalVersion}</p>
                   <p>{new Date(snapshot.metadata.issueDate).toLocaleDateString()}</p>
                   {snapshot.metadata.city && <p>{snapshot.metadata.city}</p>}
                   <p>{snapshot.metadata.currency}</p>
@@ -530,9 +633,7 @@ export function ProposalHtmlPreview({ proposal, pagesContainerRef }: ProposalHtm
               </div>
             </div>
 
-            <div
-              className={`flex flex-col overflow-hidden ${styles.previewBody}`}
-            >
+            <div className={`flex flex-col overflow-hidden ${styles.previewBody}`}>
               {page.blocks.map((block) => (
                 <div key={block.id}>{block.content}</div>
               ))}
@@ -540,12 +641,12 @@ export function ProposalHtmlPreview({ proposal, pagesContainerRef }: ProposalHtm
             </div>
 
             <div
-              className={`border-t border-slate-200 bg-[linear-gradient(135deg,#0f172a,#1e293b)] px-5 text-xs text-slate-200 ${styles.previewFooter}`}
+              className={`border-t border-slate-200 bg-[linear-gradient(135deg,#0f172a,#1e293b)] px-[38px] text-xs text-slate-200 ${styles.previewFooter}`}
             >
               <div className="flex items-center justify-between">
                 <p>{jcBrandConfig.app.legalName}</p>
                 <p>
-                  Pagina {index + 1} de {totalPages}
+                  Pagina {index + 1} de {totalPages} | Version v{proposalVersion}
                 </p>
               </div>
             </div>

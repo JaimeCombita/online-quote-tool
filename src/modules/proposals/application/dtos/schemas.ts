@@ -1,12 +1,15 @@
 import { z } from "zod";
+import { PROPOSAL_TITLE_MAX_LENGTH } from "../../domain/constants/proposalConstraints";
 
 // Metadata
 export const ProposalMetadataSchema = z.object({
-  title: z.string().min(1, "El titulo es requerido"),
-  subtitle: z.string().optional().default(""),
+  title: z.string().min(1, "El titulo es requerido").max(PROPOSAL_TITLE_MAX_LENGTH, `El titulo no puede superar ${PROPOSAL_TITLE_MAX_LENGTH} caracteres`),
   issueDate: z.string(),
   city: z.string().optional().default(""),
   currency: z.enum(["COP", "USD"]).default("COP"),
+  version: z.number().int().positive().optional().default(1),
+  lastPublishedContentHash: z.string().optional().default(""),
+  lastPublishedAt: z.string().optional().default(""),
 });
 
 export type ProposalMetadataDTO = z.infer<typeof ProposalMetadataSchema>;
@@ -83,8 +86,7 @@ export type ProposalSectionDTO = z.infer<typeof ProposalSectionSchema>;
 
 // General form state (for UI)
 export const GeneralFormSchema = z.object({
-  title: z.string().min(1, "El titulo es requerido"),
-  subtitle: z.string().optional().default(""),
+  title: z.string().min(1, "El titulo es requerido").max(PROPOSAL_TITLE_MAX_LENGTH, `El titulo no puede superar ${PROPOSAL_TITLE_MAX_LENGTH} caracteres`),
   clientName: z.string().min(1, "El nombre del cliente es requerido"),
   clientCompany: z.string().optional().default(""),
   clientContact: z.string().optional().default(""),
@@ -101,7 +103,6 @@ export type GeneralFormDTO = z.infer<typeof GeneralFormSchema>;
 export const hasGeneralFormChanges = (original: GeneralFormDTO, current: GeneralFormDTO): boolean => {
   return (
     original.title !== current.title ||
-    original.subtitle !== current.subtitle ||
     original.clientName !== current.clientName ||
     original.clientCompany !== current.clientCompany ||
     original.clientContact !== current.clientContact ||

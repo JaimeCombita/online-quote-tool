@@ -2,11 +2,12 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { Proposal } from "../../domain/entities/Proposal";
+import { PROPOSAL_HEADER_TITLE_MAX_LENGTH, PROPOSAL_PAGE_SIDE_MARGIN_PT } from "../../domain/constants/proposalConstraints";
 
 const A4_WIDTH = 595.28;
 const A4_HEIGHT = 841.89;
-const MARGIN_X = 48;
-const MARGIN_BOTTOM = 64;
+const MARGIN_X = PROPOSAL_PAGE_SIDE_MARGIN_PT;
+const MARGIN_BOTTOM = 96;
 const LINE_HEIGHT = 16;
 const HEADER_HEIGHT = 112;
 const FOOTER_HEIGHT = 32;
@@ -26,6 +27,10 @@ const splitLines = (value: string): string[] =>
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean);
+
+const isBulletLine = (line: string): boolean => /^[•*-]\s+/.test(line);
+
+const normalizeBulletLine = (line: string): string => line.replace(/^[•*-]\s+/, "");
 
 const formatMoneyWithoutDecimals = (value: number): string =>
   new Intl.NumberFormat("es-CO", {
@@ -78,6 +83,37 @@ const wrapText = (text: string, maxWidth: number, measure: (value: string) => nu
   }
 
   return lines;
+};
+
+const truncateText = (text: string, maxLength: number): string => {
+  const normalized = normalizeText(text);
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, Math.max(maxLength - 1, 0)).trimEnd()}…`;
+};
+
+const fitTextToWidth = (
+  text: string,
+  maxWidth: number,
+  measure: (value: string) => number,
+): string => {
+  const normalized = normalizeText(text);
+  if (!normalized) {
+    return "";
+  }
+
+  if (measure(normalized) <= maxWidth) {
+    return normalized;
+  }
+
+  let candidate = normalized;
+  while (candidate.length > 0 && measure(`${candidate}…`) > maxWidth) {
+    candidate = candidate.slice(0, -1);
+  }
+
+  return `${candidate.trimEnd()}…`;
 };
 
 export const sanitizeFileName = (value: string): string =>
@@ -174,6 +210,40 @@ const buildLines = (proposal: Proposal): PdfLine[] => {
         });
       }
       lines.push({ text: "", size: 11, spacingAfter: 4 });
+    } else if (section.kind === "text") {
+      for (const line of sectionContent) {
+        const parsedLine = normalizeText(line);
+        if (!parsedLine) {
+          continue;
+        }
+
+        if (isBulletLine(parsedLine)) {
+          lines.push({
+            text: `• ${normalizeBulletLine(parsedLine)}`,
+            size: 11,
+            spacingAfter: 0,
+          });
+          continue;
+        }
+
+        const subtitleMatch = parsedLine.match(/^\*\*(.+)\*\*$/);
+        if (subtitleMatch) {
+          lines.push({
+            text: subtitleMatch[1].trim(),
+            size: 11,
+            bold: true,
+            color: { r: 0.06, g: 0.14, b: 0.26 },
+            spacingAfter: 1,
+          });
+          continue;
+        }
+
+        lines.push({
+          text: parsedLine,
+          size: 11,
+          spacingAfter: 0,
+        });
+      }
     } else {
       lines.push({
         text: section.content || "(Sin contenido)",
@@ -337,6 +407,11 @@ const drawHeader = async (
   const rightColumnWidth = 120;
   const leftStartX = MARGIN_X + 72;
   const leftMaxWidth = A4_WIDTH - leftStartX - MARGIN_X - rightColumnWidth - 16;
+  const titleText = fitTextToWidth(
+    truncateText(snap.metadata.title, PROPOSAL_HEADER_TITLE_MAX_LENGTH),
+    leftMaxWidth,
+    (value) => boldFont.widthOfTextAtSize(value, 13.5),
+  );
 
   page.drawText("Propuesta comercial", {
     x: leftStartX,
@@ -346,41 +421,24 @@ const drawHeader = async (
     color: rgb(0.72, 0.89, 1),
   });
 
-  const titleLines = wrapText(
-    snap.metadata.title,
-    leftMaxWidth,
-    (value) => boldFont.widthOfTextAtSize(value, 16),
-  ).slice(0, 2);
-
-  let headerCursorY = A4_HEIGHT - 62;
-  for (const line of titleLines) {
-    page.drawText(line, {
-      x: leftStartX,
-      y: headerCursorY,
-      size: 16,
-      font: boldFont,
-      color: rgb(1, 1, 1),
-    });
-    headerCursorY -= 16;
-  }
-
-  if (normalizeText(snap.metadata.subtitle)) {
-    const subtitleLine = wrapText(
-      normalizeText(snap.metadata.subtitle),
-      leftMaxWidth,
-      (value) => regularFont.widthOfTextAtSize(value, 10),
-    )[0];
-
-    page.drawText(subtitleLine, {
-      x: leftStartX,
-      y: headerCursorY,
-      size: 10,
-      font: regularFont,
-      color: rgb(0.86, 0.91, 0.97),
-    });
-  }
+  page.drawText(titleText, {
+    x: leftStartX,
+    y: A4_HEIGHT - 62,
+    size: 13.5,
+    font: boldFont,
+    color: rgb(1, 1, 1),
+  });
 
   const rightX = A4_WIDTH - MARGIN_X - rightColumnWidth;
+  const versionLabel = `Version v${snap.metadata.version ?? 1}`;
+  page.drawText(versionLabel, {
+    x: rightX,
+    y: A4_HEIGHT - 32,
+    size: 10,
+    font: regularFont,
+    color: rgb(0.86, 0.91, 0.97),
+  });
+
   page.drawText(new Date(snap.metadata.issueDate).toLocaleDateString("es-CO"), {
     x: rightX,
     y: A4_HEIGHT - 48,
@@ -409,11 +467,13 @@ const drawHeader = async (
 };
 
 const drawFooter = (
+  proposal: Proposal,
   page: PDFDocument["addPage"] extends (...args: never[]) => infer T ? T : never,
   pageNumber: number,
   totalPages: number,
   regularFont: Awaited<ReturnType<PDFDocument["embedFont"]>>,
 ): void => {
+  const versionLabel = `Version v${proposal.snapshot.metadata.version ?? 1}`;
   page.drawRectangle({
     x: 0,
     y: 0,
@@ -431,7 +491,15 @@ const drawFooter = (
   });
 
   page.drawText(`Pagina ${pageNumber} de ${totalPages}`, {
-    x: A4_WIDTH - MARGIN_X - 88,
+    x: A4_WIDTH - MARGIN_X - 130,
+    y: 11,
+    size: 9,
+    font: regularFont,
+    color: rgb(0.86, 0.91, 0.97),
+  });
+
+  page.drawText(versionLabel, {
+    x: A4_WIDTH - MARGIN_X - 24,
     y: 11,
     size: 9,
     font: regularFont,
@@ -480,7 +548,7 @@ export const generateProposalPdf = async (proposal: Proposal): Promise<Uint8Arra
 
   const pages = pdfDoc.getPages();
   for (let index = 0; index < pages.length; index += 1) {
-    drawFooter(pages[index], index + 1, pages.length, regularFont);
+    drawFooter(proposal, pages[index], index + 1, pages.length, regularFont);
   }
 
   return pdfDoc.save();

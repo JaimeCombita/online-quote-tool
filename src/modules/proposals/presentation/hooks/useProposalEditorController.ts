@@ -63,6 +63,7 @@ export const useProposalEditorController = ({ proposalId }: UseProposalEditorCon
 
   const {
     handleGeneralDataSubmit,
+    handleRenewProposal,
     handleAddSection,
     handleUpdateSection,
     handleDeleteSection,
@@ -127,6 +128,10 @@ export const useProposalEditorController = ({ proposalId }: UseProposalEditorCon
   }, [proposal]);
 
   const pdfValidation = useMemo(() => proposal?.validateForPdf() ?? null, [proposal]);
+  const isProposalExpired = useMemo(
+    () => (proposal ? proposal.isOfferExpired(new Date()) : false),
+    [proposal],
+  );
   const safePdfValidation = useMemo(
     () =>
       pdfValidation ?? {
@@ -165,8 +170,10 @@ export const useProposalEditorController = ({ proposalId }: UseProposalEditorCon
     companySettings,
     previewPagesContainerRef,
     generalDataInitialValues,
+    isProposalExpired,
     pdfValidation: safePdfValidation,
     handleGeneralDataSubmit,
+    handleRenewProposal,
     handleIssuerSubmit,
     handleAddSection,
     handleUpdateSection,

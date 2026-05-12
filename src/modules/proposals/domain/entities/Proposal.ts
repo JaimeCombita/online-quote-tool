@@ -1,4 +1,5 @@
 import { DomainError } from "../errors/DomainError";
+import { PROPOSAL_TITLE_MAX_LENGTH } from "../constants/proposalConstraints";
 
 export type SectionKind =
   | "text"
@@ -35,10 +36,12 @@ export interface ProposalInvestment {
 
 export interface ProposalMetadata {
   title: string;
-  subtitle?: string;
   issueDate: string;
   city?: string;
   currency: "COP" | "USD";
+  version?: number;
+  lastPublishedContentHash?: string;
+  lastPublishedAt?: string;
 }
 
 export interface ProposalClientInfo {
@@ -76,6 +79,9 @@ export interface ProposalProps {
   investment: ProposalInvestment;
   closingText?: string;
   showSignature: boolean;
+  publicationState?: {
+    hasUnpublishedChanges: boolean;
+  };
   createdAt: string;
   updatedAt: string;
 }
@@ -112,6 +118,88 @@ const defaultIssuerProfile: ProposalIssuerProfile = {
 export class Proposal {
   private constructor(private readonly props: ProposalProps) {}
 
+  private static publicationHash(snapshot: ProposalProps): string {
+    const payload = {
+      metadata: {
+        title: snapshot.metadata.title,
+        issueDate: snapshot.metadata.issueDate,
+        city: snapshot.metadata.city ?? "",
+        currency: snapshot.metadata.currency,
+      },
+      client: {
+        name: snapshot.client.name,
+        company: snapshot.client.company ?? "",
+        contactName: snapshot.client.contactName ?? "",
+        phone: snapshot.client.phone,
+        email: snapshot.client.email,
+      },
+      issuer: {
+        businessName: snapshot.issuer.businessName,
+        responsibleName: snapshot.issuer.responsibleName,
+        role: snapshot.issuer.role,
+        email: snapshot.issuer.email,
+        phone: snapshot.issuer.phone ?? "",
+        website: snapshot.issuer.website ?? "",
+        logoUrl: snapshot.issuer.logoUrl ?? "",
+        signatureText: snapshot.issuer.signatureText,
+        signatureFont: snapshot.issuer.signatureFont,
+      },
+      sections: snapshot.sections.map((section) => ({
+        id: section.id,
+        title: section.title,
+        content: section.content,
+        kind: section.kind,
+        isVisible: section.isVisible,
+      })),
+      investment: {
+        enabled: snapshot.investment.enabled,
+        title: snapshot.investment.title,
+        rows: snapshot.investment.rows.map((row) => ({
+          id: row.id,
+          concept: row.concept,
+          description: row.description,
+          quantity: row.quantity,
+          unitPrice: row.unitPrice,
+          taxRate: row.taxRate,
+        })),
+        note: snapshot.investment.note ?? "",
+        offerValidityDays: snapshot.investment.offerValidityDays ?? 30,
+        showTotals: snapshot.investment.showTotals ?? true,
+      },
+      closingText: snapshot.closingText ?? "",
+      showSignature: snapshot.showSignature,
+    };
+
+    return Proposal.hashText(Proposal.stableSerialize(payload));
+  }
+
+  private static stableSerialize(value: unknown): string {
+    if (value === null || typeof value !== "object") {
+      return JSON.stringify(value);
+    }
+
+    if (Array.isArray(value)) {
+      return `[${value.map((item) => Proposal.stableSerialize(item)).join(",")}]`;
+    }
+
+    const entries = Object.entries(value as Record<string, unknown>).sort(([a], [b]) =>
+      a.localeCompare(b),
+    );
+
+    return `{${entries
+      .map(([key, entryValue]) => `${JSON.stringify(key)}:${Proposal.stableSerialize(entryValue)}`)
+      .join(",")}}`;
+  }
+
+  private static hashText(value: string): string {
+    let hash = 2166136261;
+    for (let index = 0; index < value.length; index += 1) {
+      hash ^= value.charCodeAt(index);
+      hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);
+    }
+    return (hash >>> 0).toString(16);
+  }
+
   public static createEmpty(id: string, now: Date): Proposal {
     const isoNow = now.toISOString();
 
@@ -119,10 +207,12 @@ export class Proposal {
       id,
       metadata: {
         title: "Nueva propuesta comercial",
-        subtitle: "",
         issueDate: isoNow,
         city: "",
         currency: "COP",
+        version: 1,
+        lastPublishedContentHash: "",
+        lastPublishedAt: "",
       },
       client: {
         name: "",
@@ -141,6 +231,9 @@ export class Proposal {
       },
       closingText: "",
       showSignature: true,
+      publicationState: {
+        hasUnpublishedChanges: false,
+      },
       createdAt: isoNow,
       updatedAt: isoNow,
     });
@@ -161,6 +254,9 @@ export class Proposal {
         ...this.props.investment,
         rows: this.props.investment.rows.map((row) => ({ ...row })),
       },
+      publicationState: {
+        hasUnpublishedChanges: this.props.publicationState?.hasUnpublishedChanges ?? false,
+      },
     };
   }
 
@@ -171,6 +267,7 @@ export class Proposal {
 
     const next = this.snapshot;
     next.sections.push(section);
+      next.publicationState = { hasUnpublishedChanges: true };
     next.updatedAt = now.toISOString();
 
     return Proposal.rehydrate(next);
@@ -198,6 +295,7 @@ export class Proposal {
       ];
     }
 
+      next.publicationState = { hasUnpublishedChanges: true };
     next.updatedAt = now.toISOString();
     return Proposal.rehydrate(next);
   }
@@ -205,6 +303,7 @@ export class Proposal {
   public deleteSection(sectionId: string, now: Date): Proposal {
     const next = this.snapshot;
     next.sections = next.sections.filter((section) => section.id !== sectionId);
+      next.publicationState = { hasUnpublishedChanges: true };
     next.updatedAt = now.toISOString();
     return Proposal.rehydrate(next);
   }
@@ -224,6 +323,7 @@ export class Proposal {
     }
 
     next.sections[sectionIndex] = updatedSection;
+      next.publicationState = { hasUnpublishedChanges: true };
     next.updatedAt = now.toISOString();
     return Proposal.rehydrate(next);
   }
@@ -237,6 +337,7 @@ export class Proposal {
     }
 
     section.isVisible = !section.isVisible;
+      next.publicationState = { hasUnpublishedChanges: true };
     next.updatedAt = now.toISOString();
     return Proposal.rehydrate(next);
   }
@@ -248,7 +349,12 @@ export class Proposal {
       throw new DomainError("Title is required");
     }
 
+    if (metadata.title !== undefined && metadata.title.trim().length > PROPOSAL_TITLE_MAX_LENGTH) {
+      throw new DomainError(`Title cannot exceed ${PROPOSAL_TITLE_MAX_LENGTH} characters`);
+    }
+
     next.metadata = { ...next.metadata, ...metadata };
+      next.publicationState = { hasUnpublishedChanges: true };
     next.updatedAt = now.toISOString();
     return Proposal.rehydrate(next);
   }
@@ -261,6 +367,7 @@ export class Proposal {
     }
 
     next.client = { ...next.client, ...client };
+      next.publicationState = { hasUnpublishedChanges: true };
     next.updatedAt = now.toISOString();
     return Proposal.rehydrate(next);
   }
@@ -277,6 +384,7 @@ export class Proposal {
     }
 
     next.issuer = { ...next.issuer, ...issuer };
+      next.publicationState = { hasUnpublishedChanges: true };
     next.updatedAt = now.toISOString();
     return Proposal.rehydrate(next);
   }
@@ -284,6 +392,7 @@ export class Proposal {
   public updateInvestment(investment: Partial<ProposalInvestment>, now: Date): Proposal {
     const next = this.snapshot;
     next.investment = { ...next.investment, ...investment };
+      next.publicationState = { hasUnpublishedChanges: true };
     next.updatedAt = now.toISOString();
     return Proposal.rehydrate(next);
   }
@@ -292,6 +401,58 @@ export class Proposal {
     const next = this.snapshot;
     next.closingText = closingText;
     next.showSignature = showSignature;
+      next.publicationState = { hasUnpublishedChanges: true };
+    next.updatedAt = now.toISOString();
+    return Proposal.rehydrate(next);
+  }
+
+  public isOfferExpired(now: Date): boolean {
+    if (!this.props.investment.enabled) {
+      return false;
+    }
+
+    const issueDate = new Date(this.props.metadata.issueDate);
+    if (Number.isNaN(issueDate.getTime())) {
+      return false;
+    }
+
+    const offerValidityDays = this.props.investment.offerValidityDays ?? 30;
+    const daysSinceIssue = Math.floor((now.getTime() - issueDate.getTime()) / (1000 * 60 * 60 * 24));
+    return offerValidityDays - daysSinceIssue <= 0;
+  }
+
+  public renewIssueDate(now: Date): Proposal {
+    const next = this.snapshot;
+    next.metadata.issueDate = now.toISOString();
+      next.publicationState = { hasUnpublishedChanges: true };
+    next.updatedAt = now.toISOString();
+    return Proposal.rehydrate(next);
+  }
+
+  public prepareForPublication(now: Date): Proposal {
+    const next = this.snapshot;
+    const newHash = Proposal.publicationHash(next);
+    const lastHash = next.metadata.lastPublishedContentHash ?? "";
+    const currentVersion = next.metadata.version ?? 0;
+
+    if (next.publicationState?.hasUnpublishedChanges) {
+      if (!lastHash) {
+        next.metadata.version = Math.max(currentVersion, 1);
+      } else if (newHash !== lastHash) {
+        next.metadata.version = Math.max(currentVersion + 1, 1);
+      } else if (!next.metadata.version || next.metadata.version < 1) {
+        next.metadata.version = 1;
+      }
+
+      next.metadata.lastPublishedContentHash = newHash;
+      next.metadata.lastPublishedAt = now.toISOString();
+        next.publicationState = { hasUnpublishedChanges: false };
+    } else if (!next.metadata.version || next.metadata.version < 1) {
+      next.metadata.version = Math.max(currentVersion, 1);
+      next.metadata.lastPublishedContentHash = newHash;
+      next.metadata.lastPublishedAt = now.toISOString();
+    }
+
     next.updatedAt = now.toISOString();
     return Proposal.rehydrate(next);
   }
@@ -328,21 +489,11 @@ export class Proposal {
     }
 
     if (this.props.investment.enabled) {
-      const issueDate = new Date(this.props.metadata.issueDate);
-      const isIssueDateValid = !Number.isNaN(issueDate.getTime());
-      const offerValidityDays = this.props.investment.offerValidityDays ?? 30;
-
-      if (isIssueDateValid) {
-        const now = new Date();
-        const daysSinceIssue = Math.floor((now.getTime() - issueDate.getTime()) / (1000 * 60 * 60 * 24));
-        const isExpired = offerValidityDays - daysSinceIssue <= 0;
-
-        if (isExpired) {
-          issues.push({
-            code: "expired-offer-validity",
-            message: "La vigencia de la oferta esta expirada. Actualiza la fecha o la vigencia para continuar.",
-          });
-        }
+      if (this.isOfferExpired(new Date())) {
+        issues.push({
+          code: "expired-offer-validity",
+          message: "La vigencia de la oferta esta expirada. Renueva la propuesta o ajusta la vigencia para continuar.",
+        });
       }
     }
 

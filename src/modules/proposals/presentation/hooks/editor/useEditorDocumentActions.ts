@@ -4,6 +4,7 @@ import { Proposal } from "../../../domain/entities/Proposal";
 import { downloadBlobFile, downloadTextFile } from "../../../application/services/fileDownload";
 import {
   createProposalPreviewPdfBlob,
+  proposalPdfBlobToBase64,
 } from "../../../application/services/proposalPreviewPdfService";
 import { sendProposalEmailRequest } from "../../../application/services/proposalApiClient";
 
@@ -38,6 +39,18 @@ export const useEditorDocumentActions = ({
   setIsSendingEmail,
   setAutoSaveStatus,
 }: UseEditorDocumentActionsParams) => {
+  const preparePublishedProposal = useCallback(async (): Promise<Proposal | null> => {
+    if (!proposal) {
+      return null;
+    }
+
+    const published = proposal.prepareForPublication(new Date());
+    const saved = await proposalModule.saveProposalSnapshot.execute(published.snapshot);
+    setProposal(saved);
+    setAutoSaveStatus("saved");
+    return saved;
+  }, [proposal, proposalModule, setAutoSaveStatus, setProposal]);
+
   const handleExport = useCallback(async () => {
     if (!proposal) {
       return;
@@ -81,8 +94,19 @@ export const useEditorDocumentActions = ({
     setIsGeneratingPdf(true);
 
     try {
+      const publishedProposal = await preparePublishedProposal();
+      if (!publishedProposal) {
+        return;
+      }
+
+      // Ensure the preview reflects the latest version metadata before capture.
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => resolve());
+      });
+
       const blob = await createProposalPreviewPdfBlob(previewPagesContainerRef.current);
-      const fileName = `${proposal.snapshot.metadata.title || "propuesta"}.pdf`;
+      const version = publishedProposal.snapshot.metadata.version ?? 1;
+      const fileName = `${publishedProposal.snapshot.metadata.title || "propuesta"}-v${version}.pdf`;
       downloadBlobFile(blob, fileName);
       setError(null);
     } catch (err) {
@@ -91,7 +115,7 @@ export const useEditorDocumentActions = ({
       setIsGeneratingPdf(false);
       setBlockingMessage(null);
     }
-  }, [previewPagesContainerRef, proposal, setBlockingMessage, setError, setIsGeneratingPdf]);
+  }, [preparePublishedProposal, previewPagesContainerRef, proposal, setBlockingMessage, setError, setIsGeneratingPdf]);
 
   const handleSendEmail = useCallback(async () => {
     if (!proposal) {
@@ -107,11 +131,24 @@ export const useEditorDocumentActions = ({
     setIsSendingEmail(true);
 
     try {
+      const publishedProposal = await preparePublishedProposal();
+      if (!publishedProposal) {
+        return;
+      }
+
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => resolve());
+      });
+
+      const previewPdfBlob = await createProposalPreviewPdfBlob(previewPagesContainerRef.current);
+      const previewPdfBase64 = await proposalPdfBlobToBase64(previewPdfBlob);
+
       await sendProposalEmailRequest({
-        proposal: proposal.snapshot,
+        proposal: publishedProposal.snapshot,
         to: recipientEmail.trim(),
         subject: emailSubject,
         message: emailMessage,
+        pdfBase64: previewPdfBase64,
       });
 
       setError(null);
@@ -125,6 +162,7 @@ export const useEditorDocumentActions = ({
   }, [
     emailMessage,
     emailSubject,
+    preparePublishedProposal,
     previewPagesContainerRef,
     proposal,
     recipientEmail,

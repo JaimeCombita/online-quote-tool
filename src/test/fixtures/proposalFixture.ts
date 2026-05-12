@@ -7,7 +7,6 @@ export const buildProposalSnapshot = (overrides: Partial<ProposalProps> = {}): P
     id: "proposal-1",
     metadata: {
       title: "Propuesta QA",
-      subtitle: "Automatizacion",
       issueDate: now,
       city: "Bogota",
       currency: "COP",

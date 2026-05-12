@@ -15,6 +15,7 @@ export function ProposalDraftCard({ draft, onExport, onDelete, onSendWp }: Propo
   const menuRef = useRef<HTMLDivElement | null>(null);
   const snap = draft.snapshot;
   const pdfValidation = draft.validateForPdf();
+  const proposalVersion = snap.metadata.version ?? 1;
 
   const issueDate = new Date(snap.metadata.issueDate);
   const today = new Date();
@@ -65,9 +66,14 @@ export function ProposalDraftCard({ draft, onExport, onDelete, onSendWp }: Propo
             <h3 className="text-lg font-semibold text-slate-900">{snap.metadata.title}</h3>
             <ProposalPdfReadinessPanel compact={true} validation={pdfValidation} />
           </div>
-          {snap.metadata.subtitle && (
-            <p className="mt-1 text-sm text-slate-600">{snap.metadata.subtitle}</p>
-          )}
+          <div className="mt-1 flex items-center gap-2 text-xs text-slate-500">
+            <span className="rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-700">Version v{proposalVersion}</span>
+            {snap.publicationState?.hasUnpublishedChanges && (
+              <span className="rounded-full bg-amber-100 px-2 py-1 font-semibold text-amber-700">
+                Cambios pendientes
+              </span>
+            )}
+          </div>
           <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-500">
             <p>
               <strong>Cliente:</strong> {snap.client.name}
