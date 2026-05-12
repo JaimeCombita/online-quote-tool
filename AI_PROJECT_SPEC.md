@@ -86,6 +86,8 @@ At minimum, instrument:
 Before completing changes:
 
 - Run `npm run build`.
+- Run `npm run test:coverage`.
+- Coverage minimum is mandatory: `80%` for `lines`, `functions`, `statements`, and `branches`.
 - Keep/adjust tests for changed behavior.
 - Prefer focused updates over broad refactors.
 

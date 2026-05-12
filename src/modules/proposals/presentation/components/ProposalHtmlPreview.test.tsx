@@ -86,4 +86,62 @@ describe("ProposalHtmlPreview", () => {
     expect(screen.queryByText("Subtotal")).toBeNull();
     expect(screen.queryByText("Impuestos")).toBeNull();
   });
+
+  it("renders fallback row for table sections without body rows", () => {
+    const proposal = buildProposal({
+      sections: [
+        {
+          id: "table-1",
+          title: "Tabla",
+          content: "Columna A|Columna B",
+          kind: "table",
+          isVisible: true,
+        },
+      ],
+    });
+
+    render(<ProposalHtmlPreview proposal={proposal} />);
+
+    expect(screen.getByText("Sin filas en la tabla")).toBeInTheDocument();
+  });
+
+  it("renders normalized bullet lines inside text sections", () => {
+    const proposal = buildProposal({
+      sections: [
+        {
+          id: "text-1",
+          title: "Texto",
+          content: "Linea normal\n- Primer punto\n• Segundo punto",
+          kind: "text",
+          isVisible: true,
+        },
+      ],
+      showSignature: false,
+    });
+
+    render(<ProposalHtmlPreview proposal={proposal} />);
+
+    expect(screen.getByText("Linea normal")).toBeInTheDocument();
+    expect(screen.getByText("• Primer punto")).toBeInTheDocument();
+    expect(screen.getByText("• Segundo punto")).toBeInTheDocument();
+  });
+
+  it("renders investment empty-state row and note lines", () => {
+    const proposal = buildProposal({
+      investment: {
+        enabled: true,
+        title: "Inversion",
+        rows: [],
+        note: "Nota uno\nNota dos",
+        offerValidityDays: 15,
+        showTotals: true,
+      },
+    });
+
+    render(<ProposalHtmlPreview proposal={proposal} />);
+
+    expect(screen.getByText("Sin filas en la inversion")).toBeInTheDocument();
+    expect(screen.getByText("Nota uno")).toBeInTheDocument();
+    expect(screen.getByText("Nota dos")).toBeInTheDocument();
+  });
 });
