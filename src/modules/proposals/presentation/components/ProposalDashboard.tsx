@@ -91,7 +91,7 @@ export function ProposalDashboard() {
   return (
     <div className="space-y-6">
       {/* Create New Button */}
-      <div className="flex justify-end gap-2">
+      <div className="flex flex-wrap justify-end gap-2">
         <input
           ref={importJsonInputRef}
           type="file"

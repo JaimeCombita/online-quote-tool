@@ -258,8 +258,8 @@ export function ProposalHtmlPreview({ proposal, pagesContainerRef }: ProposalHtm
             )}
 
             {section.kind === "table" && (
-              <div className="ml-6 overflow-hidden rounded-2xl border border-slate-200">
-                <table className="min-w-full border-collapse text-left text-sm text-slate-700">
+              <div className="ml-6 overflow-x-auto rounded-2xl border border-slate-200">
+                <table className="min-w-[560px] border-collapse text-left text-sm text-slate-700">
                   {tableHeader.length > 0 && (
                     <thead>
                       <tr className="bg-sky-300">
@@ -413,7 +413,8 @@ export function ProposalHtmlPreview({ proposal, pagesContainerRef }: ProposalHtm
             {!isFirstChunk && <div className="h-1" />}
 
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-              <table className="min-w-full border-collapse text-left text-sm text-slate-700">
+              <div className="overflow-x-auto">
+              <table className="min-w-[560px] border-collapse text-left text-sm text-slate-700">
                 <thead className="bg-sky-300 text-slate-900">
                   <tr>
                     <th className="border border-slate-300 px-3 py-2 text-xs font-semibold">Concepto</th>
@@ -454,6 +455,7 @@ export function ProposalHtmlPreview({ proposal, pagesContainerRef }: ProposalHtm
                   )}
                 </tbody>
               </table>
+              </div>
             </div>
 
             {isLastChunk && shouldShowInvestmentTotals && (

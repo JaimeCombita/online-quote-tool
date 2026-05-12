@@ -120,7 +120,7 @@ export function ProposalEditor({ proposalId }: ProposalEditorProps) {
 
       {/* Header */}
       <div className="rounded-lg border border-slate-200 bg-white p-4">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">{snap.metadata.title}</h1>
             <div className="mt-4 flex flex-wrap gap-2">
@@ -141,8 +141,8 @@ export function ProposalEditor({ proposalId }: ProposalEditorProps) {
               </button>
             </div>
           </div>
-          <div className="text-right text-xs text-slate-500">
-            <p>ID: {snap.id}</p>
+          <div className="text-left text-xs text-slate-500 sm:text-right">
+            <p className="break-all">ID: {snap.id}</p>
             <p>Actualizado: {new Date(snap.updatedAt).toLocaleString()}</p>
             <p>Version: v{proposalVersion}</p>
             <p className={hasUnpublishedChanges ? "text-amber-600" : "text-emerald-600"}>
@@ -176,7 +176,7 @@ export function ProposalEditor({ proposalId }: ProposalEditorProps) {
       <ProposalPdfReadinessPanel validation={pdfValidation} />
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-slate-200">
+      <div className="flex gap-2 overflow-x-auto border-b border-slate-200 pb-1">
         {editorTabs.map((tab) => (
           <button
             key={tab}
@@ -184,7 +184,7 @@ export function ProposalEditor({ proposalId }: ProposalEditorProps) {
               setActiveTab(tab);
               setSectionAction("list");
             }}
-            className={`px-4 py-2 text-sm font-medium transition ${
+            className={`shrink-0 whitespace-nowrap px-4 py-2 text-sm font-medium transition ${
               activeTab === tab
                 ? "border-b-2 border-sky-700 text-sky-700"
                 : "text-slate-600 hover:text-slate-900"

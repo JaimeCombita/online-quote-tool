@@ -62,8 +62,8 @@ export function JcEngineBrandFrame({
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <p className="text-xs uppercase tracking-[0.28em] text-[var(--jc-primary-100)]">{pageTag}</p>
-              <h1 className="mt-3 text-3xl font-semibold leading-tight sm:text-4xl">{pageTitle}</h1>
-              <p className="mt-3 max-w-3xl text-sm text-[var(--jc-primary-100)] sm:text-base">
+              <h1 className="mt-3 break-words text-3xl font-semibold leading-tight sm:text-4xl">{pageTitle}</h1>
+              <p className="mt-3 max-w-3xl break-words text-sm text-[var(--jc-primary-100)] sm:text-base">
                 {pageSubtitle}
               </p>
             </div>
